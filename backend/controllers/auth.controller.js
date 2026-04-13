@@ -29,7 +29,7 @@ export const registerUser = async(req,res)=>{
         }
         const hashedPassword = await bcrypt.hash(password,10);
 
-        const otp = Math.floor(100000 + Math.Random() * 900000).toString(); 
+        const otp = Math.floor(100000 + Math.random() * 900000).toString(); 
 
         const otpExpiry = new Date(Date.now()+10*60*10000)
 
@@ -48,6 +48,51 @@ export const registerUser = async(req,res)=>{
         res.status(201).json({
                 message:"User registred successfully",
                 userId:user._id
+        });
+    }
+    catch(error){
+        res.status(500).json({
+            message:error.message
+        })
+    }
+}
+
+export const verifyOtp = async(req,res)=>{
+    try{
+        const { email , otp } = req.body;
+        if(!email || !otp){
+            return res.status(400).json({
+                message:"Email ans Otp are Required"
+            })
+        }
+        const user = await User.findOne({email});
+
+        if(!user){
+            return res.status(400).json({
+                message:"User not found"
+            })
+        }
+        if(user.otp !==otp)
+        {
+            return res.status(400).json({
+                message:"Invalid OTP"
+            })
+        }
+
+        if(user.otpExpiry<new Date())
+        {
+            return res.status(400).json({
+                message:"OTP expired"
+            })
+        }
+        user.isVerified=true;
+        user.otp=null;
+        user.otpExpiry=null
+        
+        await user.save();
+
+        res.status(200).json({
+            message:"Email is verified successfully"
         });
     }
     catch(error){
