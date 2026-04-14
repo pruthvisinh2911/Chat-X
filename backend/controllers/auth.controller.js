@@ -104,13 +104,27 @@ export const verifyOtp = async(req,res)=>{
 
 export const loginUser = async (req,res)=>{
     try{
-        const{email,password}=req.body;
+        const{email,username,password}=req.body;
 
-        const user = await User.findOne({email})
+
+        if((!email && !username) || !password){
+                return res.status(400).json({
+                    message:"email/username and password is required"
+                })
+        }
+
+        const user = await User.findOne({
+            $or:[{
+                email,
+            },{
+                    username,
+                }
+            ],
+        })
 
         if(!user){
             return res.status(400).json({
-                message:"Invalid Credentials"
+                message:"user not found"
             })
         }
         const isMatch = await bcrypt.compare(password,user.password);
@@ -120,16 +134,28 @@ export const loginUser = async (req,res)=>{
                 message:"Invalid Credentails"
             })
         }
+
+        if(!user.isVerified){
+            return res.status(400).json({
+                message:"Please verify your email first"
+            })
+        
+        }
         const token = jwt.sign({
-            userId:user._id
+            id:user._id
         },
     process.env.JWT_SECRET,
 {
-    expiresIn:"7d"
+    expiresIn:"1d"
 });
 res.json({
+    message:"Login successfully",
     token,
-    userId:user._id
+    user:{
+        id:user._id,
+        username:user.username,
+        email:user.email,
+    },
 });
  }
     catch(error)
