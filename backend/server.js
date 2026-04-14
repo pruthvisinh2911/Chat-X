@@ -6,8 +6,6 @@ import authRoutes from "./routes/auth.routes.js"
 import userRoutes from "./routes/user.routes.js"
 import mongoSanitize from "express-mongo-sanitize";
 
-
-
 dotenv.config()
 
 connectDB()
