@@ -2,60 +2,90 @@ import User from "../models/User.model.js";
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 
-export const registerUser = async(req,res)=>{
-    try{
-        const{firstName , lastName , username , email , password} = req.body;
 
-        if(!firstName || !lastName || !username || !email || !password){
-            return res.status(400).json({
-                message:"All Fields Are Required"
-            })
-        }
+export const registerUser = async (req, res) => {
+  try {
+    let { firstName, lastName, username, email, password } = req.body;
 
-        const emailExists = await User.findOne({email});
-        if(emailExists)
-        {
-            return res.status(400).json({
-                message:"Email is Already Exists"
-            })
-        }
-
-        const usernameExists = await User.findOne({username})
-
-        if(usernameExists){
-            return res.status(400).json({
-                message:"User Already Exist"
-            })
-        }
-        const hashedPassword = await bcrypt.hash(password,10);
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString(); 
-
-        const otpExpiry = new Date(Date.now()+10*60*10000)
-
-        const user = await User.create({
-            firstName,
-            lastName,
-            username,
-            email,
-            password:hashedPassword,
-            otp,
-            otpExpiry
-        });
-
-        console.log(`opt for ${email}:${otp}`)
-
-        res.status(201).json({
-                message:"User registred successfully",
-                userId:user._id
-        });
+    if (!firstName || !lastName || !username || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
     }
-    catch(error){
-        res.status(500).json({
-            message:error.message
-        })
+
+    if (
+      typeof firstName !== "string" ||
+      typeof lastName !== "string" ||
+      typeof username !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      return res.status(400).json({ message: "Invalid input format" });
     }
-}
+
+
+    firstName = firstName.trim();
+    lastName = lastName.trim();
+    username = username.trim().toLowerCase();
+    email = email.trim().toLowerCase();
+
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
+    }
+
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+
+    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const hashedOtp = await bcrypt.hash(rawOtp, 10);
+
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    const user = await User.create({
+      firstName,
+      lastName,
+      username,
+      email,
+      password: hashedPassword,
+      otp: hashedOtp,
+      otpExpiry,
+      isVerified: false,
+    });
+
+    console.log(`OTP for ${email}: ${rawOtp}`);
+
+    res.status(201).json({
+      message: "Registration successful. Please verify your email.",
+      userId: user._id,
+    });
+  } catch (error) {
+    console.error("Register Error:", error.message);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
 
 export const verifyOtp = async(req,res)=>{
     try{
