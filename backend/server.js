@@ -1,23 +1,23 @@
 import dotenv from "dotenv"
 import express from "express"
 import cors from "cors"
+import helmet from "helmet";
+import { authLimiter } from "./middleware/rateLimit.js";
 import connectDB from "./config/db.js"
 import authRoutes from "./routes/auth.routes.js"
 import userRoutes from "./routes/user.routes.js"
-import mongoSanitize from "express-mongo-sanitize";
 
 dotenv.config()
-
 connectDB()
-
 
 const app = express();
 
-app.use(mongoSanitize());
+app.use(helmet());
 app.use(cors())
 app.use(express.json())
 app.use("/api/auth",authRoutes)
 app.use("/api/users",userRoutes)
+app.use("/api/auth", authLimiter);
 
 
 app.get("/",(req,res)=>{
