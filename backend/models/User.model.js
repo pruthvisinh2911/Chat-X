@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
-
+    // 🔐 OTP SYSTEM
     otp: {
       type: String,
     },
@@ -47,6 +47,7 @@ const userSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // 🔐 LOGIN SECURITY
     loginAttempts: {
       type: Number,
       default: 0,
@@ -62,6 +63,6 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;
