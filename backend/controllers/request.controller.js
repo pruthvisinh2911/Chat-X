@@ -1,51 +1,41 @@
-import Request from "../models/request.model.js"
+import Request from "../models/request.model.js";
 
-export const sendRequest = async(req,res)=>{
-    try{
-        const recieverId = req.body
-        const senderId = req.user.userId
+export const acceptRequest = async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const userId = req.user.id;
 
-        const existing = await Request.findOne({
-            senderId,
-            recieverId,
-        })
-        if(existing)
-        {
-            return res.status(400).json({
-                message:"request already sent"
-            })
-        }
-        const request = await Request.create({
-            senderId,
-            recieverId,
-        })
-        res.status(201).json({
-            request
-        })
+    const request = await Request.findById(requestId);
+
+    if (!request) {
+      return res.status(404).json({
+        message: "Request not found",
+      });
     }
-    catch(error){
-            res.status(500).json({
-                message:error.message
-            })
-    }
-}
 
-export const acceptRequest = async(req,res)=>
-{
-    try{
-        const request = await Request.findById(req.param.id);
-
-        request.status = "accepted"
-        await request.save()
-
-        req.json({
-            message:"Request Accepted"
-        })
+    if (request.receiverId.toString() !== userId) {
+      return res.status(403).json({
+        message: "Not authorized to accept this request",
+      });
     }
-    catch(error)
-    {
-        res.status(500).json({
-            message:error.message
-        })
+
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        message: "Request already handled",
+      });
     }
-}
+
+    request.status = "accepted";
+    await request.save();
+
+    res.json({
+      message: "Request accepted",
+    });
+  } catch (error) {
+    console.error("Accept Request Error:", error.message);
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
