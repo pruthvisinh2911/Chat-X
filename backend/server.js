@@ -2,7 +2,7 @@ import dotenv from "dotenv"
 import express from "express"
 import cors from "cors"
 import helmet from "helmet";
-import { authLimiter } from "./middleware/rateLimit.js";
+import { authLimiter } from "./middleware/ratelimit.middleware.js";
 import connectDB from "./config/db.js"
 import authRoutes from "./routes/auth.routes.js"
 import userRoutes from "./routes/user.routes.js"

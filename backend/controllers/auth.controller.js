@@ -1,4 +1,5 @@
 import User from "../models/User.model.js";
+import Session from "../models/session.model.js";
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 
@@ -233,6 +234,15 @@ export const loginUser = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+
+    await Session.create({
+  userId: user._id,
+  token: token,
+  deviceInfo: req.headers["user-agent"] || "unknown",
+  ipAddress: req.ip,
+  isValid: true,
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
 
     res.json({
       message: "Login successful",
