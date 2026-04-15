@@ -245,6 +245,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    // 🔐 account lock check
     if (user.lockUntil && user.lockUntil > Date.now()) {
       return res.status(403).json({
         message: "Account temporarily locked. Try later.",
@@ -254,7 +255,7 @@ export const loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      user.loginAttempts += 1;
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
 
       if (user.loginAttempts >= 5) {
         user.lockUntil = Date.now() + 15 * 60 * 1000;
@@ -273,24 +274,38 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    // reset attempts
     user.loginAttempts = 0;
     user.lockUntil = null;
     await user.save();
 
+    // 🔐 secrets
+    const ACCESS_SECRET = process.env.JWT_SECRET;
+    const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+
+    if (!ACCESS_SECRET || !REFRESH_SECRET) {
+      return res.status(500).json({
+        message: "JWT secrets missing",
+      });
+    }
+
+    // 🔐 tokens
     const accessToken = jwt.sign(
       { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" } // short life
+      ACCESS_SECRET,
+      { expiresIn: "15m" }
     );
 
     const refreshToken = jwt.sign(
       { id: user._id },
-      process.env.JWT_REFRESH_SECRET,
+      REFRESH_SECRET,
       { expiresIn: "7d" }
     );
 
+    // 🔐 hash refresh token
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
+    // 🔐 store session
     await Session.create({
       userId: user._id,
       refreshToken: hashedRefreshToken,
@@ -300,9 +315,10 @@ export const loginUser = async (req, res) => {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
+    // 🔐 cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: true, 
+      secure: process.env.NODE_ENV === "production",
       sameSite: "Strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -325,7 +341,6 @@ export const loginUser = async (req, res) => {
     });
   }
 };
-
 export const logoutUser = async (req, res) => {
   try {
     const sessionId = req.user.sessionId;
