@@ -341,25 +341,41 @@ export const loginUser = async (req, res) => {
     });
   }
 };
+
 export const logoutUser = async (req, res) => {
   try {
-    const sessionId = req.user.sessionId;
+    const refreshToken = req.cookies?.refreshToken;
 
-    if (!sessionId) {
+    if (!refreshToken) {
       return res.status(400).json({
-        message: "Session not found",
+        message: "No refresh token found",
       });
     }
 
-    const session = await Session.findByIdAndUpdate(
-      sessionId,
-      { isValid: false },
-      { new: true }
-    );
+    // find all active sessions
+    const sessions = await Session.find({ isValid: true });
 
-    if (!session) {
+    let sessionFound = false;
+
+    for (const session of sessions) {
+      const isMatch = await bcrypt.compare(
+        refreshToken,
+        session.refreshToken
+      );
+
+      if (isMatch) {
+        session.isValid = false;
+        await session.save();
+        sessionFound = true;
+        break;
+      }
+    }
+
+    res.clearCookie("refreshToken");
+
+    if (!sessionFound) {
       return res.status(400).json({
-        message: "Invalid session",
+        message: "Session already invalid",
       });
     }
 
@@ -375,7 +391,6 @@ export const logoutUser = async (req, res) => {
     });
   }
 };
-
 export const logoutAllDevices = async (req, res) => {
   try {
     const userId = req.user.id;

@@ -35,7 +35,6 @@ const userSchema = new mongoose.Schema(
     default: false,
   },
 
-  // 🔐 OTP SYSTEM
   otp: String,
   otpExpiry: Date,
 
@@ -44,7 +43,6 @@ const userSchema = new mongoose.Schema(
     default: 0,
   },
 
-  // 🔐 LOGIN SECURITY
   loginAttempts: {
     type: Number,
     default: 0,

@@ -6,7 +6,7 @@ export const protect = async (req, res, next) => {
   try {
     let token;
 
-    // 1. Extract token
+    // 🔹 Extract token
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -20,7 +20,7 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 2. Verify JWT
+    // 🔹 Verify access token
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -30,20 +30,20 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 3. Find session (VERY IMPORTANT SECURITY CHECK)
+    // 🔹 Check if user has ANY valid session
     const session = await Session.findOne({
-      token,
       userId: decoded.id,
       isValid: true,
+      expiresAt: { $gt: new Date() },
     });
 
     if (!session) {
       return res.status(401).json({
-        message: "Session expired or invalid",
+        message: "Session expired, please login again",
       });
     }
 
-    // 4. Get user safely
+    // 🔹 Fetch user
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
@@ -52,12 +52,11 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 5. Attach full user context (better than only id)
+    // 🔹 Attach user
     req.user = {
       id: user._id,
       email: user.email,
       username: user.username,
-      sessionId: session._id,
     };
 
     next();
