@@ -2,6 +2,7 @@ import User from "../models/User.model.js";
 import Session from "../models/session.model.js";
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
+import { sendOtpEmail } from "../utils/sendEmail.utils.js";
 
 
 export const registerUser = async (req, res) => {
@@ -95,7 +96,9 @@ export const registerUser = async (req, res) => {
       isVerified: false,
     });
 
-    console.log(`OTP for ${email}: ${rawOtp}`);
+    
+    await sendOtpEmail(email, rawOtp);
+
 
     return res.status(201).json({
       message: "Registration successful. Please verify your email.",

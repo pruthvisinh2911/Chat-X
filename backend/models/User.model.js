@@ -60,8 +60,7 @@ username: {
       default: null,
     },
     refreshToken: {
-      type: String,
-      required: true,
+      type: String
 }
   },
   {
