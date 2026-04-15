@@ -22,11 +22,29 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid input format" });
     }
 
-
     firstName = firstName.trim();
     lastName = lastName.trim();
     username = username.trim().toLowerCase();
     email = email.trim().toLowerCase();
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({
+        message: "Username must be between 3 and 20 characters",
+      });
+    }
+
+    if (firstName.length < 2 || lastName.length < 2) {
+      return res.status(400).json({
+        message: "Name must be at least 2 characters",
+      });
+    }
+
+    const usernameRegex = /^[a-z0-9_]+$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        message: "Username can only contain letters, numbers, underscore",
+      });
+    }
 
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,17 +52,22 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    
-    if (password.length < 6) {
+
+    const passwordRegex =
+      /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
+
+    if (!passwordRegex.test(password)) {
       return res.status(400).json({
-        message: "Password must be at least 6 characters",
+        message:
+          "Password must be at least 8 characters and include letter, number and special character",
       });
     }
 
-    
+
     const existingUser = await User.findOne({
       $or: [{ email }, { username }],
     });
+
 
     if (existingUser) {
       return res.status(400).json({
@@ -52,15 +75,13 @@ export const registerUser = async (req, res) => {
       });
     }
 
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
 
     const hashedOtp = await bcrypt.hash(rawOtp, 10);
 
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     const user = await User.create({
       firstName,
@@ -70,23 +91,26 @@ export const registerUser = async (req, res) => {
       password: hashedPassword,
       otp: hashedOtp,
       otpExpiry,
+      otpAttempts: 0,
       isVerified: false,
     });
 
     console.log(`OTP for ${email}: ${rawOtp}`);
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Registration successful. Please verify your email.",
       userId: user._id,
     });
+
   } catch (error) {
     console.error("Register Error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
 };
+
 
 export const verifyOtp = async (req, res) => {
   try {
@@ -105,12 +129,25 @@ export const verifyOtp = async (req, res) => {
     }
 
     email = email.trim().toLowerCase();
+    otp = otp.trim();
+
+    if (!/^\d{6}$/.test(otp)) {
+      return res.status(400).json({
+        message: "Invalid OTP format",
+      });
+    }
 
     const user = await User.findOne({ email });
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid credentials",
+        message: "Invalid OTP",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        message: "User already verified",
       });
     }
 
@@ -121,21 +158,30 @@ export const verifyOtp = async (req, res) => {
     }
 
     if (user.otpExpiry < new Date()) {
+      user.otp = null;
+      user.otpExpiry = null;
+      await user.save();
+
       return res.status(400).json({
         message: "OTP expired",
+      });
+    }
+
+
+    if (user.otpAttempts >= 3) {
+      user.otp = null;
+      user.otpExpiry = null;
+      await user.save();
+
+      return res.status(400).json({
+        message: "Too many attempts. Request new OTP",
       });
     }
 
     const isMatch = await bcrypt.compare(otp, user.otp);
 
     if (!isMatch) {
-      user.otpAttempts = (user.otpAttempts || 0) + 1;
-
-      if (user.otpAttempts >= 3) {
-        user.otp = null;
-        user.otpExpiry = null;
-      }
-
+      user.otpAttempts += 1;
       await user.save();
 
       return res.status(400).json({
@@ -150,18 +196,18 @@ export const verifyOtp = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Email verified successfully",
     });
+
   } catch (error) {
     console.error("OTP Verify Error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
 };
-
 
 export const loginUser = async (req, res) => {
   try {
@@ -196,20 +242,19 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    if (user.loginAttempts >= 5 && user.lockUntil > Date.now()) {
+    if (user.lockUntil && user.lockUntil > Date.now()) {
       return res.status(403).json({
         message: "Account temporarily locked. Try later.",
       });
     }
 
-
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      user.loginAttempts = (user.loginAttempts || 0) + 1;
+      user.loginAttempts += 1;
 
       if (user.loginAttempts >= 5) {
-        user.lockUntil = Date.now() + 15 * 60 * 1000; // 15 min
+        user.lockUntil = Date.now() + 15 * 60 * 1000;
       }
 
       await user.save();
@@ -229,83 +274,113 @@ export const loginUser = async (req, res) => {
     user.lockUntil = null;
     await user.save();
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "15m" } // short life
     );
 
-    await Session.create({
-  userId: user._id,
-  token: token,
-  deviceInfo: req.headers["user-agent"] || "unknown",
-  ipAddress: req.ip,
-  isValid: true,
-  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-  });
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    res.json({
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+
+    await Session.create({
+      userId: user._id,
+      refreshToken: hashedRefreshToken,
+      deviceInfo: req.headers["user-agent"] || "unknown",
+      ipAddress: req.ip,
+      isValid: true,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true, 
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
       message: "Login successful",
-      token,
+      accessToken,
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
       },
     });
+
   } catch (error) {
     console.error("Login Error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
 };
 
+export const logoutUser = async (req, res) => {
+  try {
+    const sessionId = req.user.sessionId;
 
-export const logoutUser = async(req,res)=>{
-  try{
-      const token = req.headers.authorization?.split(" ")[1]
-
-      if(!token){
-        return res.status(400).json({
-          message:"token Required"
-        })
-      }
-      await Session.findOneAndUpdate({
-        token
-      },{
-        isvalid:false,
+    if (!sessionId) {
+      return res.status(400).json({
+        message: "Session not found",
       });
+    }
 
-      return res.status(200).json({
-        message:"Logged out sucessfully"
-      })
+    const session = await Session.findByIdAndUpdate(
+      sessionId,
+      { isValid: false },
+      { new: true }
+    );
+
+    if (!session) {
+      return res.status(400).json({
+        message: "Invalid session",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Logged out successfully",
+    });
+
+  } catch (error) {
+    console.error("Logout Error:", error.message);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
-  catch(error){
-        return res.status(500).json(
-          {
-            message:"server error"
-          }
-        )
-  } 
-}
-
+};
 
 export const logoutAllDevices = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    await Session.updateMany(
+    const result = await Session.updateMany(
       { userId, isValid: true },
       { isValid: false }
     );
 
+    if (result.matchedCount === 0) {
+      return res.status(400).json({
+        message: "No active sessions found",
+      });
+    }
+
     return res.status(200).json({
       message: "Logged out from all devices",
+      sessionsRevoked: result.modifiedCount,
     });
 
   } catch (error) {
+    console.error("Logout All Error:", error.message);
+
     return res.status(500).json({
       message: "Server error",
     });
