@@ -261,3 +261,53 @@ export const loginUser = async (req, res) => {
     });
   }
 };
+
+
+export const logoutUser = async(req,res)=>{
+  try{
+      const token = req.headers.authorization?.split(" ")[1]
+
+      if(!token){
+        return res.status(400).json({
+          message:"token Required"
+        })
+      }
+      await Session.findOneAndUpdate({
+        token
+      },{
+        isvalid:false,
+      });
+
+      return res.status(200).json({
+        message:"Logged out sucessfully"
+      })
+  }
+  catch(error){
+        return res.status(500).json(
+          {
+            message:"server error"
+          }
+        )
+  } 
+}
+
+
+export const logoutAllDevices = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    await Session.updateMany(
+      { userId, isValid: true },
+      { isValid: false }
+    );
+
+    return res.status(200).json({
+      message: "Logged out from all devices",
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
