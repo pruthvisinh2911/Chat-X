@@ -7,12 +7,14 @@ import { authLimiter } from "./middleware/ratelimit.middleware.js";
 import connectDB from "./config/db.js"
 import authRoutes from "./routes/auth.routes.js"
 import userRoutes from "./routes/user.routes.js"
+import cookieParser from "cookie-parser"
 
 
 connectDB()
 
 const app = express();
 
+app.use(cookieParser());
 app.use(helmet());
 app.use(cors())
 app.use(express.json())
