@@ -103,6 +103,7 @@ export const registerUser = async (req, res) => {
     return res.status(201).json({
       message: "Registration successful. Please verify your email.",
       userId: user._id,
+      otp:rawOtp,
     });
 
   } catch (error) {
@@ -169,7 +170,6 @@ export const verifyOtp = async (req, res) => {
         message: "OTP expired",
       });
     }
-
 
     if (user.otpAttempts >= 3) {
       user.otp = null;
@@ -245,7 +245,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 🔐 account lock check
     if (user.lockUntil && user.lockUntil > Date.now()) {
       return res.status(403).json({
         message: "Account temporarily locked. Try later.",
@@ -274,12 +273,10 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // reset attempts
     user.loginAttempts = 0;
     user.lockUntil = null;
     await user.save();
 
-    // 🔐 secrets
     const ACCESS_SECRET = process.env.JWT_SECRET;
     const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
@@ -289,7 +286,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 🔐 tokens
     const accessToken = jwt.sign(
       { id: user._id },
       ACCESS_SECRET,
@@ -302,10 +298,9 @@ export const loginUser = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    // 🔐 hash refresh token
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
 
-    // 🔐 store session
+    
     await Session.create({
       userId: user._id,
       refreshToken: hashedRefreshToken,
@@ -315,7 +310,6 @@ export const loginUser = async (req, res) => {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
-    // 🔐 cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -352,7 +346,6 @@ export const logoutUser = async (req, res) => {
       });
     }
 
-    // find all active sessions
     const sessions = await Session.find({ isValid: true });
 
     let sessionFound = false;

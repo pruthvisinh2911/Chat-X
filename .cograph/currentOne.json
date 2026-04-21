@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "name": "currentOne",
+  "description": "",
+  "savedAt": "2026-04-21T13:47:56.749Z",
+  "settings": {
+    "complexityLevel": 1,
+    "clusterGroupBy": "connectivity",
+    "layoutMode": "dynamic",
+    "gitMode": true,
+    "languageMode": true,
+    "folderMode": true,
+    "classMode": false
+  },
+  "nodePositions": {
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\config\\db.js::connectDB::3": {
+      "x": 312.23846241322366,
+      "y": 624.6867807868215
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\auth.controller.js::registerUser::8": {
+      "x": -353.3820933029265,
+      "y": 950.0229482362062
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\auth.controller.js::verifyOtp::119": {
+      "x": -376.99040051193583,
+      "y": -564.9834645054599
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\auth.controller.js::loginUser::215": {
+      "x": 865.6906837606743,
+      "y": 1391.929717874733
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\auth.controller.js::logoutUser::339": {
+      "x": 328.4193128481848,
+      "y": -807.4076640570217
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\auth.controller.js::logoutAllDevices::387": {
+      "x": 1026.6932909354098,
+      "y": 839.830051039727
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\request.controller.js::acceptRequest::3": {
+      "x": -479.353173990983,
+      "y": 80.93558096779765
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\user.controller.js::searchUsers::3": {
+      "x": 998.8878516623481,
+      "y": -356.0090287247952
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\controllers\\user.controller.js::escapeRegex::28": {
+      "x": 907.2745011766217,
+      "y": -333.7862218852441
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\middleware\\auth.middleware.js::protect::5": {
+      "x": 1119.9885355203792,
+      "y": 298.4604646745962
+    },
+    "c:\\Users\\Pravinsinh\\Desktop\\Chat X\\backend\\utils\\sendEmail.utils.js::sendOtpEmail::3": {
+      "x": -433.4704033029232,
+      "y": 901.313127946329
+    }
+  }
+}
