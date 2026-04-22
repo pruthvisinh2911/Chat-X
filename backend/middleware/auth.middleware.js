@@ -1,12 +1,7 @@
-import jwt from "jsonwebtoken";
-import Session from "../models/session.model.js";
-import User from "../models/User.model.js";
-
 export const protect = async (req, res, next) => {
   try {
     let token;
 
-    // 🔹 Extract token
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -20,7 +15,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 🔹 Verify access token
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -30,8 +24,8 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 🔹 Check if user has ANY valid session
     const session = await Session.findOne({
+      _id: decoded.sessionId,
       userId: decoded.id,
       isValid: true,
       expiresAt: { $gt: new Date() },
@@ -43,7 +37,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 🔹 Fetch user
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
@@ -52,7 +45,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 🔹 Attach user
     req.user = {
       id: user._id,
       email: user.email,

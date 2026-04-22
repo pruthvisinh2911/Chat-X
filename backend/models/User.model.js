@@ -23,6 +23,7 @@ const userSchema = new mongoose.Schema(
   password: {
     type: String,
     required: true,
+    select: false, // 🔒 hide by default
   },
 
   profilePic: {
@@ -35,8 +36,16 @@ const userSchema = new mongoose.Schema(
     default: false,
   },
 
-  otp: String,
-  otpExpiry: Date,
+  otp: {
+    type: String,
+    default: null,
+    select: false, // 🔒 sensitive
+  },
+
+  otpExpiry: {
+    type: Date,
+    default: null,
+  },
 
   otpAttempts: {
     type: Number,
@@ -53,10 +62,29 @@ const userSchema = new mongoose.Schema(
     default: null,
   },
 
+  // 🔥 PASSWORD RESET
+  resetPasswordToken: {
+    type: String,
+    default: null,
+    select: false, // 🔒 hide token
+  },
+
+  resetPasswordExpiry: {
+    type: Date,
+    default: null,
+    index: true, // ⚡ helps with cleanup queries
+  },
+
 },
 {
   timestamps: true,
 });
+
+// Optional: auto cleanup expired reset tokens (TTL)
+userSchema.index(
+  { resetPasswordExpiry: 1 },
+  { expireAfterSeconds: 0 }
+);
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 

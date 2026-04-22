@@ -115,7 +115,99 @@ export const registerUser = async (req, res) => {
   }
 };
 
+export const refreshAccessToken = async (req, res) => {
+  try {
+    const oldRefreshToken = req.cookies?.refreshToken;
 
+    if (!oldRefreshToken) {
+      return res.status(401).json({
+        message: "No refresh token",
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        oldRefreshToken,
+        process.env.JWT_REFRESH_SECRET
+      );
+    } catch (err) {
+      return res.status(401).json({
+        message: "Invalid refresh token",
+      });
+    }
+
+    const session = await Session.findById(decoded.sessionId);
+
+    if (
+      !session ||
+      !session.isValid ||
+      session.expiresAt < new Date()
+    ) {
+      return res.status(401).json({
+        message: "Session expired",
+      });
+    }
+
+    // ✅ Ensure user exists
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      oldRefreshToken,
+      session.refreshToken
+    );
+
+    // 🚨 REUSE DETECTED
+    if (!isMatch) {
+      await Session.updateMany(
+        { userId: session.userId },
+        { isValid: false }
+      );
+
+      return res.status(403).json({
+        message: "Token reuse detected. All sessions revoked.",
+      });
+    }
+
+    const newAccessToken = jwt.sign(
+      { id: user._id, sessionId: session._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const newRefreshToken = jwt.sign(
+      { id: user._id, sessionId: session._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    session.refreshToken = await bcrypt.hash(newRefreshToken, 10);
+    await session.save();
+
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      accessToken: newAccessToken,
+    });
+
+  } catch (error) {
+    console.error("Refresh Token Error:", error.message);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
 export const verifyOtp = async (req, res) => {
   try {
     let { email, otp } = req.body;
@@ -211,7 +303,6 @@ export const verifyOtp = async (req, res) => {
     });
   }
 };
-
 export const loginUser = async (req, res) => {
   try {
     let { email, username, password } = req.body;
@@ -286,29 +377,32 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    const accessToken = jwt.sign(
-      { id: user._id },
-      ACCESS_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    const refreshToken = jwt.sign(
-      { id: user._id },
-      REFRESH_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-
-    
-    await Session.create({
+    // ✅ Create session FIRST
+    const session = await Session.create({
       userId: user._id,
-      refreshToken: hashedRefreshToken,
+      refreshToken: "temp",
       deviceInfo: req.headers["user-agent"] || "unknown",
       ipAddress: req.ip,
       isValid: true,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
+
+    // ✅ Tokens WITH sessionId
+    const accessToken = jwt.sign(
+      { id: user._id, sessionId: session._id },
+      ACCESS_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user._id, sessionId: session._id },
+      REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // ✅ Hash and store refresh token
+    session.refreshToken = await bcrypt.hash(refreshToken, 10);
+    await session.save();
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -338,39 +432,33 @@ export const loginUser = async (req, res) => {
 
 export const logoutUser = async (req, res) => {
   try {
-    const refreshToken = req.cookies?.refreshToken;
+    const token =
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+        ? req.headers.authorization.split(" ")[1]
+        : null;
 
-    if (!refreshToken) {
+    if (!token) {
       return res.status(400).json({
-        message: "No refresh token found",
+        message: "No token provided",
       });
     }
 
-    const sessions = await Session.find({ isValid: true });
-
-    let sessionFound = false;
-
-    for (const session of sessions) {
-      const isMatch = await bcrypt.compare(
-        refreshToken,
-        session.refreshToken
-      );
-
-      if (isMatch) {
-        session.isValid = false;
-        await session.save();
-        sessionFound = true;
-        break;
-      }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({
+        message: "Invalid token",
+      });
     }
+
+    // ✅ Invalidate ONLY this session
+    await Session.findByIdAndUpdate(decoded.sessionId, {
+      isValid: false,
+    });
 
     res.clearCookie("refreshToken");
-
-    if (!sessionFound) {
-      return res.status(400).json({
-        message: "Session already invalid",
-      });
-    }
 
     return res.status(200).json({
       message: "Logged out successfully",
@@ -384,6 +472,7 @@ export const logoutUser = async (req, res) => {
     });
   }
 };
+
 export const logoutAllDevices = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -393,11 +482,7 @@ export const logoutAllDevices = async (req, res) => {
       { isValid: false }
     );
 
-    if (result.matchedCount === 0) {
-      return res.status(400).json({
-        message: "No active sessions found",
-      });
-    }
+    res.clearCookie("refreshToken");
 
     return res.status(200).json({
       message: "Logged out from all devices",
