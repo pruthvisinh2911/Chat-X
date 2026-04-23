@@ -1,3 +1,6 @@
+import jwt from "jsonwebtoken";
+import User from "../models/User.model.js";
+import Session from "../models/Session.model.js";
 export const protect = async (req, res, next) => {
   try {
     let token;
@@ -16,14 +19,15 @@ export const protect = async (req, res, next) => {
     }
 
     let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (err) {
-      return res.status(401).json({
-        message: "Invalid or expired token",
-      });
-    }
-
+try {
+  decoded = jwt.verify(token, process.env.JWT_SECRET);
+  console.log("DECODED:", decoded);
+} catch (err) {
+  console.log("JWT ERROR:", err.message); // 👈 VERY IMPORTANT
+  return res.status(401).json({
+    message: "Invalid or expired token",
+  });
+}
     const session = await Session.findOne({
       _id: decoded.sessionId,
       userId: decoded.id,
@@ -36,6 +40,9 @@ export const protect = async (req, res, next) => {
         message: "Session expired, please login again",
       });
     }
+
+    console.log("TOKEN:", token);
+console.log("SECRET:", process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id).select("-password");
 

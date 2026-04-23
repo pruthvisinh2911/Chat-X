@@ -2,6 +2,18 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
 {
+  firstName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
+  lastName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
   email: {
     type: String,
     required: true,
@@ -23,7 +35,7 @@ const userSchema = new mongoose.Schema(
   password: {
     type: String,
     required: true,
-    select: false, // 🔒 hide by default
+    select: false, // 🔒
   },
 
   profilePic: {
@@ -39,7 +51,7 @@ const userSchema = new mongoose.Schema(
   otp: {
     type: String,
     default: null,
-    select: false, // 🔒 sensitive
+    select: false, // 🔒
   },
 
   otpExpiry: {
@@ -62,29 +74,21 @@ const userSchema = new mongoose.Schema(
     default: null,
   },
 
-  // 🔥 PASSWORD RESET
   resetPasswordToken: {
     type: String,
     default: null,
-    select: false, // 🔒 hide token
+    select: false, // 🔒
   },
 
   resetPasswordExpiry: {
     type: Date,
     default: null,
-    index: true, // ⚡ helps with cleanup queries
   },
 
 },
 {
   timestamps: true,
 });
-
-// Optional: auto cleanup expired reset tokens (TTL)
-userSchema.index(
-  { resetPasswordExpiry: 1 },
-  { expireAfterSeconds: 0 }
-);
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 

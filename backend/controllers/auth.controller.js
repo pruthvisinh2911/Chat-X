@@ -2,6 +2,7 @@ import User from "../models/User.model.js";
 import Session from "../models/session.model.js";
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
+import crypto from "crypto";
 import { sendOtpEmail } from "../utils/sendEmail.utils.js";
 
 
@@ -208,6 +209,7 @@ export const refreshAccessToken = async (req, res) => {
     });
   }
 };
+
 export const verifyOtp = async (req, res) => {
   try {
     let { email, otp } = req.body;
@@ -233,7 +235,7 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+otp");
 
     if (!user) {
       return res.status(400).json({
@@ -247,9 +249,14 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
+    // 🔍 DEBUG LOGS (remove later)
+    console.log("Stored OTP:", user.otp);
+    console.log("Expiry:", user.otpExpiry);
+    console.log("Now:", new Date());
+
     if (!user.otp || !user.otpExpiry) {
       return res.status(400).json({
-        message: "OTP not found or already used",
+        message: "OTP expired or already used",
       });
     }
 
@@ -259,7 +266,7 @@ export const verifyOtp = async (req, res) => {
       await user.save();
 
       return res.status(400).json({
-        message: "OTP expired",
+        message: "OTP expired. Please request a new one",
       });
     }
 
@@ -284,6 +291,7 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
+    // ✅ SUCCESS
     user.isVerified = true;
     user.otp = null;
     user.otpExpiry = null;
@@ -303,6 +311,7 @@ export const verifyOtp = async (req, res) => {
     });
   }
 };
+
 export const loginUser = async (req, res) => {
   try {
     let { email, username, password } = req.body;
@@ -328,7 +337,7 @@ export const loginUser = async (req, res) => {
 
     const user = await User.findOne({
       $or: [{ email }, { username }],
-    });
+    }).select("+password");
 
     if (!user) {
       return res.status(400).json({
@@ -429,7 +438,133 @@ export const loginUser = async (req, res) => {
     });
   }
 };
+export const forgotPassword = async (req, res) => {
+  try {
+    let { email } = req.body;
 
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({
+        message: "Valid email is required",
+      });
+    }
+
+    email = email.trim().toLowerCase();
+
+    const user = await User.findOne({ email });
+
+    // ⚠️ Don't reveal user existence (security)
+    if (!user) {
+      return res.status(200).json({
+        message: "If this email exists, a reset link has been sent",
+      });
+    }
+
+    // 🔥 generate secure token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // 🔐 hash token before saving
+    const hashedToken = await bcrypt.hash(resetToken, 10);
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+    await user.save();
+
+    // 👉 create reset link
+    const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+
+    // 📧 send email (you already have mail util — reuse it or create new)
+    await sendOtpEmail(email, `Reset your password: ${resetLink}`);
+
+    return res.status(200).json({
+      message: "If this email exists, a reset link has been sent",
+    });
+
+  } catch (error) {
+    console.error("Forgot Password Error:", error.message);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword, confirmPassword } = req.body;
+
+    if (!token || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        message: "All fields are required",
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: "Passwords do not match",
+      });
+    }
+
+    // 🔐 strong password check (same as register)
+    const passwordRegex =
+      /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
+
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters and include letter, number and special character",
+      });
+    }
+
+    // 🔍 find user with valid token
+    const users = await User.find({
+      resetPasswordExpiry: { $gt: new Date() },
+    }).select("+resetPasswordToken");
+
+    let validUser = null;
+
+    for (let user of users) {
+      const isMatch = await bcrypt.compare(token, user.resetPasswordToken);
+      if (isMatch) {
+        validUser = user;
+        break;
+      }
+    }
+
+    if (!validUser) {
+      return res.status(400).json({
+        message: "Invalid or expired token",
+      });
+    }
+
+    // 🔐 hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    validUser.password = hashedPassword;
+
+    // ❌ clear reset fields
+    validUser.resetPasswordToken = null;
+    validUser.resetPasswordExpiry = null;
+
+    await validUser.save();
+
+    // 🚨 optional but IMPORTANT: logout all sessions
+    await Session.updateMany(
+      { userId: validUser._id },
+      { isValid: false }
+    );
+
+    return res.status(200).json({
+      message: "Password reset successful. Please login again.",
+    });
+
+  } catch (error) {
+    console.error("Reset Password Error:", error.message);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
 export const logoutUser = async (req, res) => {
   try {
     const token =
@@ -497,3 +632,6 @@ export const logoutAllDevices = async (req, res) => {
     });
   }
 };
+
+
+
