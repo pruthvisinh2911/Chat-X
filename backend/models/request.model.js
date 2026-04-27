@@ -25,10 +25,8 @@ const requestSchema = new mongoose.Schema(
   }
 );
 
-// 🔥 Prevent duplicate requests
 requestSchema.index({ senderId: 1, receiverId: 1 }, { unique: true });
 
-// 🔥 Prevent self-request
 requestSchema.pre("save", function (next) {
   if (this.senderId.equals(this.receiverId)) {
     return next(new Error("You cannot send request to yourself"));

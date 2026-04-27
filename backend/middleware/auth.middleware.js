@@ -23,7 +23,7 @@ try {
   decoded = jwt.verify(token, process.env.JWT_SECRET);
   console.log("DECODED:", decoded);
 } catch (err) {
-  console.log("JWT ERROR:", err.message); // 👈 VERY IMPORTANT
+  console.log("JWT ERROR:", err.message); 
   return res.status(401).json({
     message: "Invalid or expired token",
   });

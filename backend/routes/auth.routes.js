@@ -5,9 +5,10 @@ import {
   loginUser,
   logoutUser,
   logoutAllDevices,
-  refreshAccessToken
+  refreshAccessToken,
+  forgotPassword,
+  resetPassword,
 } from "../controllers/auth.controller.js";
-
 
 import { protect } from "../middleware/auth.middleware.js";
 
@@ -24,6 +25,10 @@ router.post("/logout", protect, logoutUser);
 router.post("/logout-all", protect, logoutAllDevices);
 
 router.post("/refresh-token", refreshAccessToken);
+
+router.post("/forgot-password", forgotPassword);
+
+router.post("/reset-password", resetPassword);
 
 router.get("/profile", protect, (req, res) => {
   res.json({

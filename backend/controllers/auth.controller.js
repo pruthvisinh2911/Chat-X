@@ -311,7 +311,6 @@ export const verifyOtp = async (req, res) => {
     });
   }
 };
-
 export const loginUser = async (req, res) => {
   try {
     let { email, username, password } = req.body;
@@ -504,7 +503,7 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    // 🔐 strong password check (same as register)
+
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
 
@@ -515,10 +514,11 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    // 🔍 find user with valid token
+    
     const users = await User.find({
       resetPasswordExpiry: { $gt: new Date() },
     }).select("+resetPasswordToken");
+    console.log(resetPasswordToken, token);
 
     let validUser = null;
 

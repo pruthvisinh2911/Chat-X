@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
   password: {
     type: String,
     required: true,
-    select: false, // 🔒
+    select: false, 
   },
 
   profilePic: {
@@ -51,7 +51,7 @@ const userSchema = new mongoose.Schema(
   otp: {
     type: String,
     default: null,
-    select: false, // 🔒
+    select: false, 
   },
 
   otpExpiry: {
@@ -77,7 +77,7 @@ const userSchema = new mongoose.Schema(
   resetPasswordToken: {
     type: String,
     default: null,
-    select: false, // 🔒
+    select: false, 
   },
 
   resetPasswordExpiry: {

@@ -6,7 +6,7 @@ const sessionSchema = new mongoose.Schema(
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
-    index: true, // 🔥 faster lookups
+    index: true, 
   },
 
   refreshToken: {
@@ -27,7 +27,7 @@ const sessionSchema = new mongoose.Schema(
   isValid: {
     type: Boolean,
     default: true,
-    index: true, // 🔥 important for queries
+    index: true, 
   },
 
   expiresAt: {
@@ -40,10 +40,8 @@ const sessionSchema = new mongoose.Schema(
 }
 );
 
-// 🔥 Auto-delete expired sessions
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// 🔥 Prevent duplicate active sessions with same token (extra safety)
 sessionSchema.index({ userId: 1, refreshToken: 1 });
 
 const Session = mongoose.models.Session || mongoose.model("Session", sessionSchema);
