@@ -80,6 +80,12 @@ const userSchema = new mongoose.Schema(
     select: false, 
   },
 
+  resetPasswordTokenId: {   
+    type: String,
+    default: null,
+    index: true,
+  },
+
   resetPasswordExpiry: {
     type: Date,
     default: null,
@@ -89,7 +95,6 @@ const userSchema = new mongoose.Schema(
 {
   timestamps: true,
 });
-
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;

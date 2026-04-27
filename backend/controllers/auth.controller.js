@@ -1,4 +1,6 @@
 import User from "../models/User.model.js";
+import asyncHandler from "../utils/asyncHandler.utils.js";
+import ApiError from "../utils/ApiError.utils.js";
 import Session from "../models/session.model.js";
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
@@ -7,7 +9,7 @@ import { sendOtpEmail } from "../utils/sendEmail.utils.js";
 
 
 export const registerUser = async (req, res) => {
-  try {
+  
     let { firstName, lastName, username, email, password } = req.body;
 
     if (!firstName || !lastName || !username || !email || !password) {
@@ -107,17 +109,17 @@ export const registerUser = async (req, res) => {
       otp:rawOtp,
     });
 
-  } catch (error) {
+
     console.error("Register Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 
 export const refreshAccessToken = async (req, res) => {
-  try {
+
     const oldRefreshToken = req.cookies?.refreshToken;
 
     if (!oldRefreshToken) {
@@ -199,17 +201,17 @@ export const refreshAccessToken = async (req, res) => {
       accessToken: newAccessToken,
     });
 
-  } catch (error) {
+
     console.error("Refresh Token Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 
 export const verifyOtp = async (req, res) => {
-  try {
+
     let { email, otp } = req.body;
 
     if (!email || !otp) {
@@ -299,16 +301,16 @@ export const verifyOtp = async (req, res) => {
       message: "Email verified successfully",
     });
 
-  } catch (error) {
+  
     console.error("OTP Verify Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 export const loginUser = async (req, res) => {
-  try {
+
     let { email, username, password } = req.body;
 
     if ((!email && !username) || !password) {
@@ -422,16 +424,16 @@ export const loginUser = async (req, res) => {
       },
     });
 
-  } catch (error) {
+
     console.error("Login Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 export const forgotPassword = async (req, res) => {
-  try {
+
     let { email } = req.body;
 
     if (!email || typeof email !== "string") {
@@ -450,16 +452,20 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    const tokenId = crypto.randomBytes(16).toString("hex");
+    const rawToken = crypto.randomBytes(32).toString("hex");
 
-    const hashedToken = await bcrypt.hash(resetToken, 10);
+    const hashedToken = await bcrypt.hash(rawToken, 10);
 
     user.resetPasswordToken = hashedToken;
+    user.resetPasswordTokenId = tokenId;
     user.resetPasswordExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
 
     await user.save();
 
-    const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    const combinedToken = `${tokenId}.${rawToken}`;
+
+    const resetLink = `${process.env.CLIENT_URL}/reset-password/${combinedToken}`;
 
     await sendOtpEmail(email, `Reset your password: ${resetLink}`);
 
@@ -467,16 +473,16 @@ export const forgotPassword = async (req, res) => {
       message: "If this email exists, a reset link has been sent",
     });
 
-  } catch (error) {
+  
     console.error("Forgot Password Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 export const resetPassword = async (req, res) => {
-  try {
+  
     const { token, newPassword, confirmPassword } = req.body;
 
     if (!token || !newPassword || !confirmPassword) {
@@ -501,38 +507,48 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    const users = await User.find({
-      resetPasswordExpiry: { $gt: new Date() },
-    }).select("+resetPasswordToken");
-    console.log(resetPasswordToken, token);
+    const [tokenId, rawToken] = token.split(".");
 
-    let validUser = null;
-
-    for (let user of users) {
-      const isMatch = await bcrypt.compare(token, user.resetPasswordToken);
-      if (isMatch) {
-        validUser = user;
-        break;
-      }
+    if (!tokenId || !rawToken) {
+      return res.status(400).json({
+        message: "Invalid token format",
+      });
     }
 
-    if (!validUser) {
+    const user = await User.findOne({
+      resetPasswordTokenId: tokenId,
+      resetPasswordExpiry: { $gt: new Date() },
+    }).select("+resetPasswordToken +password");
+
+    if (!user) {
       return res.status(400).json({
         message: "Invalid or expired token",
       });
     }
 
+    const isMatch = await bcrypt.compare(
+      rawToken,
+      user.resetPasswordToken
+    );
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid or expired token",
+      });
+    }
+
+
     const hashedPassword = await bcrypt.hash(newPassword, 12);
+    user.password = hashedPassword;
 
-    validUser.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordTokenId = null;
+    user.resetPasswordExpiry = null;
 
-    validUser.resetPasswordToken = null;
-    validUser.resetPasswordExpiry = null;
-
-    await validUser.save();
+    await user.save();
 
     await Session.updateMany(
-      { userId: validUser._id },
+      { userId: user._id },
       { isValid: false }
     );
 
@@ -540,16 +556,16 @@ export const resetPassword = async (req, res) => {
       message: "Password reset successful. Please login again.",
     });
 
-  } catch (error) {
+
     console.error("Reset Password Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 export const logoutUser = async (req, res) => {
-  try {
+  
     const token =
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -581,17 +597,17 @@ export const logoutUser = async (req, res) => {
       message: "Logged out successfully",
     });
 
-  } catch (error) {
+
     console.error("Logout Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 
 export const logoutAllDevices = async (req, res) => {
-  try {
+
     const userId = req.user.id;
 
     const result = await Session.updateMany(
@@ -606,13 +622,13 @@ export const logoutAllDevices = async (req, res) => {
       sessionsRevoked: result.modifiedCount,
     });
 
-  } catch (error) {
+  
     console.error("Logout All Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
 
 

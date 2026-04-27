@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 import Session from "../models/Session.model.js";
 export const protect = async (req, res, next) => {
-  try {
+
     let token;
 
     if (
@@ -19,10 +19,10 @@ export const protect = async (req, res, next) => {
     }
 
     let decoded;
-try {
+
   decoded = jwt.verify(token, process.env.JWT_SECRET);
   console.log("DECODED:", decoded);
-} catch (err) {
+
   console.log("JWT ERROR:", err.message); 
   return res.status(401).json({
     message: "Invalid or expired token",
@@ -59,11 +59,10 @@ console.log("SECRET:", process.env.JWT_SECRET);
     };
 
     next();
-  } catch (error) {
+
     console.error("Auth Middleware Error:", error.message);
 
     return res.status(401).json({
       message: "Not authorized",
     });
-  }
-};
+  

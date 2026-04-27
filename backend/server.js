@@ -8,7 +8,7 @@ import connectDB from "./config/db.js"
 import authRoutes from "./routes/auth.routes.js"
 import userRoutes from "./routes/user.routes.js"
 import cookieParser from "cookie-parser"
-
+import errorHandler from "./middleware/error.middleware.js";
 
 connectDB()
 
@@ -17,6 +17,7 @@ const app = express();
 app.use(cookieParser());
 app.use(helmet());
 app.use(cors())
+app.use(errorHandler)
 app.use(express.json())
 app.use("/api/auth", authLimiter);
 app.use("/api/auth",authRoutes)

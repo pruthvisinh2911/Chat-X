@@ -1,7 +1,6 @@
 import Request from "../models/request.model.js";
 
 export const acceptRequest = async (req, res) => {
-  try {
     const requestId = req.params.id;
     const userId = req.user.id;
 
@@ -31,11 +30,10 @@ export const acceptRequest = async (req, res) => {
     res.json({
       message: "Request accepted",
     });
-  } catch (error) {
+
     console.error("Accept Request Error:", error.message);
 
     res.status(500).json({
       message: "Server error",
     });
-  }
 };

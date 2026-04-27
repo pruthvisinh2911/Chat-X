@@ -1,7 +1,9 @@
 import User from "../models/User.model.js"
+import asyncHandler from "../utils/asyncHandler.utils.js";
+import ApiError from "../utils/ApiError.utils.js";
 
 export const searchUsers = async (req, res) => {
-  try {
+
     let { search } = req.query;
     const currentUserId = req.user.id;
 
@@ -39,11 +41,11 @@ export const searchUsers = async (req, res) => {
       .limit(10);
 
     res.json(users);
-  } catch (error) {
+
     console.error("Search Error:", error.message);
 
     res.status(500).json({
       message: "Server error",
     });
-  }
+  
 };
