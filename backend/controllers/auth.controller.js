@@ -150,7 +150,6 @@ export const refreshAccessToken = async (req, res) => {
       });
     }
 
-    // ✅ Ensure user exists
     const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(401).json({
@@ -162,8 +161,7 @@ export const refreshAccessToken = async (req, res) => {
       oldRefreshToken,
       session.refreshToken
     );
-
-    // 🚨 REUSE DETECTED
+ 
     if (!isMatch) {
       await Session.updateMany(
         { userId: session.userId },
@@ -249,7 +247,6 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
-    // 🔍 DEBUG LOGS (remove later)
     console.log("Stored OTP:", user.otp);
     console.log("Expiry:", user.otpExpiry);
     console.log("Now:", new Date());
@@ -291,7 +288,6 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
-    // ✅ SUCCESS
     user.isVerified = true;
     user.otp = null;
     user.otpExpiry = null;
@@ -385,7 +381,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // ✅ Create session FIRST
     const session = await Session.create({
       userId: user._id,
       refreshToken: "temp",
@@ -395,7 +390,6 @@ export const loginUser = async (req, res) => {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
-    // ✅ Tokens WITH sessionId
     const accessToken = jwt.sign(
       { id: user._id, sessionId: session._id },
       ACCESS_SECRET,
@@ -408,7 +402,6 @@ export const loginUser = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    // ✅ Hash and store refresh token
     session.refreshToken = await bcrypt.hash(refreshToken, 10);
     await session.save();
 
@@ -451,17 +444,14 @@ export const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
 
-    // ⚠️ Don't reveal user existence (security)
     if (!user) {
       return res.status(200).json({
         message: "If this email exists, a reset link has been sent",
       });
     }
 
-    // 🔥 generate secure token
     const resetToken = crypto.randomBytes(32).toString("hex");
 
-    // 🔐 hash token before saving
     const hashedToken = await bcrypt.hash(resetToken, 10);
 
     user.resetPasswordToken = hashedToken;
@@ -469,10 +459,8 @@ export const forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // 👉 create reset link
     const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-    // 📧 send email (you already have mail util — reuse it or create new)
     await sendOtpEmail(email, `Reset your password: ${resetLink}`);
 
     return res.status(200).json({
@@ -503,7 +491,6 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
 
@@ -514,7 +501,6 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    
     const users = await User.find({
       resetPasswordExpiry: { $gt: new Date() },
     }).select("+resetPasswordToken");
@@ -536,18 +522,15 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    // 🔐 hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     validUser.password = hashedPassword;
 
-    // ❌ clear reset fields
     validUser.resetPasswordToken = null;
     validUser.resetPasswordExpiry = null;
 
     await validUser.save();
 
-    // 🚨 optional but IMPORTANT: logout all sessions
     await Session.updateMany(
       { userId: validUser._id },
       { isValid: false }
@@ -588,7 +571,6 @@ export const logoutUser = async (req, res) => {
       });
     }
 
-    // ✅ Invalidate ONLY this session
     await Session.findByIdAndUpdate(decoded.sessionId, {
       isValid: false,
     });
