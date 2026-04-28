@@ -8,11 +8,18 @@ import crypto from "crypto";
 import { sendOtpEmail } from "../utils/sendEmail.utils.js";
 
 
+import mongoose from "mongoose";
+
 export const registerUser = async (req, res) => {
-  
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
     let { firstName, lastName, username, email, password } = req.body;
 
     if (!firstName || !lastName || !username || !email || !password) {
+      await session.abortTransaction();
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -23,6 +30,7 @@ export const registerUser = async (req, res) => {
       typeof email !== "string" ||
       typeof password !== "string"
     ) {
+      await session.abortTransaction();
       return res.status(400).json({ message: "Invalid input format" });
     }
 
@@ -32,12 +40,14 @@ export const registerUser = async (req, res) => {
     email = email.trim().toLowerCase();
 
     if (username.length < 3 || username.length > 20) {
+      await session.abortTransaction();
       return res.status(400).json({
         message: "Username must be between 3 and 20 characters",
       });
     }
 
     if (firstName.length < 2 || lastName.length < 2) {
+      await session.abortTransaction();
       return res.status(400).json({
         message: "Name must be at least 2 characters",
       });
@@ -45,35 +55,35 @@ export const registerUser = async (req, res) => {
 
     const usernameRegex = /^[a-z0-9_]+$/;
     if (!usernameRegex.test(username)) {
+      await session.abortTransaction();
       return res.status(400).json({
         message: "Username can only contain letters, numbers, underscore",
       });
     }
 
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      await session.abortTransaction();
       return res.status(400).json({ message: "Invalid email format" });
     }
-
 
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
 
     if (!passwordRegex.test(password)) {
+      await session.abortTransaction();
       return res.status(400).json({
         message:
           "Password must be at least 8 characters and include letter, number and special character",
       });
     }
 
-
     const existingUser = await User.findOne({
       $or: [{ email }, { username }],
-    });
-
+    }).session(session);
 
     if (existingUser) {
+      await session.abortTransaction();
       return res.status(400).json({
         message: "User already exists",
       });
@@ -82,42 +92,50 @@ export const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
-
     const hashedOtp = await bcrypt.hash(rawOtp, 10);
-
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    const user = await User.create({
-      firstName,
-      lastName,
-      username,
-      email,
-      password: hashedPassword,
-      otp: hashedOtp,
-      otpExpiry,
-      otpAttempts: 0,
-      isVerified: false,
-    });
+    const user = await User.create(
+      [
+        {
+          firstName,
+          lastName,
+          username,
+          email,
+          password: hashedPassword,
+          otp: hashedOtp,
+          otpExpiry,
+          otpAttempts: 0,
+          isVerified: false,
+        },
+      ],
+      { session }
+    );
 
-    
+    // 🔥 If this fails → transaction will rollback automatically
     await sendOtpEmail(email, rawOtp);
 
+    // ✅ Commit only if EVERYTHING succeeded
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(201).json({
       message: "Registration successful. Please verify your email.",
-      userId: user._id,
-      otp:rawOtp,
+      userId: user[0]._id,
+      otp: rawOtp,
     });
 
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
 
-    console.error("Register Error:", error.message);
+    console.error("REGISTER ERROR FULL:", error);
 
     return res.status(500).json({
-      message: "Server error",
+      message: error.message || "Server error",
     });
-  
+  }
 };
-
 export const refreshAccessToken = async (req, res) => {
 
     const oldRefreshToken = req.cookies?.refreshToken;

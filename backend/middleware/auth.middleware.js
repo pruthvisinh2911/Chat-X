@@ -6,7 +6,6 @@ export const protect = async (req, res, next) => {
   try {
     let token;
 
-    // ✅ Extract token
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -20,7 +19,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // ✅ Verify token safely
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -32,7 +30,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // ✅ Check session
     const session = await Session.findOne({
       _id: decoded.sessionId,
       userId: decoded.id,
@@ -46,7 +43,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // ✅ Get user
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
@@ -55,7 +51,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // ✅ Attach user
     req.user = {
       id: user._id,
       email: user.email,

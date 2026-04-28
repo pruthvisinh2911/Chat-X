@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const sendOtpEmail = async (to, otp) => {
-
+  try {
     await axios.post(
       "https://api.brevo.com/v3/smtp/email",
       {
@@ -25,8 +25,13 @@ export const sendOtpEmail = async (to, otp) => {
     );
 
     console.log("OTP email sent successfully");
-  
-    console.error("Email send error:", error.response?.data || error.message);
-    throw new Error("Email sending failed");
-  
+
+  } catch (error) {
+    console.error(
+      "Email send error:",
+      error.response?.data || error.message
+    );
+
+    throw error; 
+  }
 };
