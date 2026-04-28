@@ -19,10 +19,13 @@ export const protect = async (req, res, next) => {
       });
     }
 
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET missing");
+    }
+
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log("DECODED:", decoded);
     } catch (err) {
       console.log("JWT ERROR:", err.message);
       return res.status(401).json({

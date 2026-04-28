@@ -6,8 +6,7 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import crypto from "crypto";
 import { sendOtpEmail } from "../utils/sendEmail.utils.js";
-
-
+import AuditLog from "../models/AuditLog.model.js";
 import mongoose from "mongoose";
 
 export const registerUser = async (req, res) => {
@@ -112,10 +111,8 @@ export const registerUser = async (req, res) => {
       { session }
     );
 
-    // 🔥 If this fails → transaction will rollback automatically
     await sendOtpEmail(email, rawOtp);
 
-    // ✅ Commit only if EVERYTHING succeeded
     await session.commitTransaction();
     session.endSession();
 
@@ -124,6 +121,16 @@ export const registerUser = async (req, res) => {
       userId: user[0]._id,
       otp: rawOtp,
     });
+    try {
+  await AuditLog.create({
+    userId: user._id,
+    action: "LOGIN",
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+} catch (err) {
+  console.error("Audit log failed:", err.message);
+}
 
   } catch (error) {
     await session.abortTransaction();
@@ -327,6 +334,55 @@ export const verifyOtp = async (req, res) => {
     });
   
 };
+
+export const resendOtp = async (req, res) => {
+  try {
+    let { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    email = email.trim().toLowerCase();
+
+    const user = await User.findOne({ email }).select("+otp +otpExpiry");
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified" });
+    }
+
+    // ❗ prevent spam
+    if (user.otpExpiry && user.otpExpiry > new Date()) {
+      return res.status(400).json({
+        message: "OTP already sent. Please wait before requesting again.",
+      });
+    }
+
+    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = await bcrypt.hash(rawOtp, 10);
+
+    user.otp = hashedOtp;
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    user.otpAttempts = 0;
+
+    await user.save();
+
+    await sendOtpEmail(email, rawOtp);
+
+    return res.status(200).json({
+      message: "OTP resent successfully",
+    });
+
+  } catch (error) {
+    console.error("Resend OTP Error:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const loginUser = async (req, res) => {
 
     let { email, username, password } = req.body;
@@ -442,7 +498,16 @@ export const loginUser = async (req, res) => {
       },
     });
 
-
+try {
+  await AuditLog.create({
+    userId: user._id,
+    action: "LOGIN",
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+} catch (err) {
+  console.error("Audit log failed:", err.message);
+}
     console.error("Login Error:", error.message);
 
     return res.status(500).json({
@@ -500,7 +565,7 @@ export const forgotPassword = async (req, res) => {
   
 };
 export const resetPassword = async (req, res) => {
-  
+  try {
     const { token, newPassword, confirmPassword } = req.body;
 
     if (!token || !newPassword || !confirmPassword) {
@@ -555,7 +620,6 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
 
@@ -565,6 +629,7 @@ export const resetPassword = async (req, res) => {
 
     await user.save();
 
+    // ✅ CRITICAL SECURITY (already correct)
     await Session.updateMany(
       { userId: user._id },
       { isValid: false }
@@ -573,15 +638,42 @@ export const resetPassword = async (req, res) => {
     return res.status(200).json({
       message: "Password reset successful. Please login again.",
     });
-
-
+try {
+  await AuditLog.create({
+    userId: user._id,
+    action: "LOGIN",
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+} catch (err) {
+  console.error("Audit log failed:", err.message);
+}
+  } catch (error) {
     console.error("Reset Password Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  
+  }
 };
+export const getMySessions = async (req, res) => {
+  try {
+    const sessions = await Session.find({
+      userId: req.user.id,
+      isValid: true,
+      expiresAt: { $gt: new Date() },
+    }).select("-refreshToken");
+
+    return res.status(200).json({
+      sessions,
+    });
+
+  } catch (error) {
+    console.error("Get Sessions Error:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const logoutUser = async (req, res) => {
   
     const token =
@@ -614,13 +706,22 @@ export const logoutUser = async (req, res) => {
     return res.status(200).json({
       message: "Logged out successfully",
     });
-
-
+try {
+  await AuditLog.create({
+    userId: user._id,
+    action: "LOGIN",
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+} catch (err) {
+  console.error("Audit log failed:", err.message);
+}
     console.error("Logout Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
+    
   
 };
 
@@ -640,6 +741,16 @@ export const logoutAllDevices = async (req, res) => {
       sessionsRevoked: result.modifiedCount,
     });
 
+try {
+  await AuditLog.create({
+    userId: user._id,
+    action: "LOGIN",
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+} catch (err) {
+  console.error("Audit log failed:", err.message);
+}
   
     console.error("Logout All Error:", error.message);
 
@@ -649,5 +760,37 @@ export const logoutAllDevices = async (req, res) => {
   
 };
 
+export const logoutSingleSession = async (req, res) => {
+  try {
+    const { sessionId } = req.body;
 
+    await Session.findOneAndUpdate(
+      {
+        _id: sessionId,
+        userId: req.user.id,
+      },
+      { isValid: false }
+    );
 
+    return res.status(200).json({
+      message: "Session logged out successfully",
+    });
+
+  } catch (error) {
+    console.error("Logout Single Error:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getMyAuditLogs = async (req, res) => {
+  try {
+    const logs = await AuditLog.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    return res.status(200).json({ logs });
+  } catch (error) {
+    console.error("Audit Fetch Error:", error.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

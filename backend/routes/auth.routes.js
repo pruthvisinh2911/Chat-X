@@ -5,12 +5,16 @@ import { protect } from "../middleware/auth.middleware.js";
 import {
   registerUser,
   verifyOtp,
+  resendOtp,
   loginUser,
   logoutUser,
   logoutAllDevices,
   refreshAccessToken,
   forgotPassword,
   resetPassword,
+  getMySessions,
+  logoutSingleSession,
+  getMyAuditLogs
 } from "../controllers/auth.controller.js";
 
 import {
@@ -21,15 +25,17 @@ import {
   resetPasswordValidation
 } from "../validators/auth.validator.js";
 
-import { loginLimiter,
+import {
+  loginLimiter,
   otpLimiter,
   forgotPasswordLimiter
- } from "../middleware/ratelimit.middleware.js";
+} from "../middleware/ratelimit.middleware.js";
 
 const router = express.Router();
 
 router.post(
   "/register",
+  loginLimiter, // ✅ added
   registerValidation,
   validate,
   registerUser
@@ -44,7 +50,14 @@ router.post(
 );
 
 router.post(
+  "/resend-otp",
+  otpLimiter,
+  resendOtp
+);
+
+router.post(
   "/login",
+  loginLimiter, // ✅ added
   loginValidation,
   validate,
   loginUser
@@ -77,10 +90,17 @@ router.post(
 
 router.post(
   "/reset-password",
-  loginLimiter,
-  resetPasswordValidation,
+  resetPasswordValidation, 
   validate,
   resetPassword
+);
+
+router.get("/sessions", protect, getMySessions);
+
+router.post(
+  "/logout-session",
+  protect,
+  logoutSingleSession
 );
 
 router.get(
@@ -93,4 +113,7 @@ router.get(
     });
   }
 );
+
+router.get("/audit-logs", protect, getMyAuditLogs);
+
 export default router;
