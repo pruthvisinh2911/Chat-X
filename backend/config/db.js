@@ -1,9 +1,7 @@
 import mongoose from "mongoose";
-import asyncHandler from "../utils/asyncHandler.utils.js";
-import ApiError from "../utils/ApiError.utils.js";
 
 const connectDB = async () => {
-  
+  try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
@@ -13,13 +11,13 @@ const connectDB = async () => {
     });
 
     mongoose.connection.on("error", (err) => {
-      console.error("MongoDB runtime error:", err);
+      console.error("MongoDB runtime error:", err.message);
     });
 
-
+  } catch (error) {
     console.error("DB connection error:", error.message);
     process.exit(1);
-  
+  }
 };
 
 export default connectDB;

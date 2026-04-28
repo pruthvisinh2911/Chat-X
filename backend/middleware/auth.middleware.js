@@ -1,10 +1,12 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 import Session from "../models/Session.model.js";
-export const protect = async (req, res, next) => {
 
+export const protect = async (req, res, next) => {
+  try {
     let token;
 
+    // ✅ Extract token
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -18,16 +20,19 @@ export const protect = async (req, res, next) => {
       });
     }
 
+    // ✅ Verify token safely
     let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log("DECODED:", decoded);
+    } catch (err) {
+      console.log("JWT ERROR:", err.message);
+      return res.status(401).json({
+        message: "Invalid or expired token",
+      });
+    }
 
-  decoded = jwt.verify(token, process.env.JWT_SECRET);
-  console.log("DECODED:", decoded);
-
-  console.log("JWT ERROR:", err.message); 
-  return res.status(401).json({
-    message: "Invalid or expired token",
-  });
-}
+    // ✅ Check session
     const session = await Session.findOne({
       _id: decoded.sessionId,
       userId: decoded.id,
@@ -41,9 +46,7 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    console.log("TOKEN:", token);
-console.log("SECRET:", process.env.JWT_SECRET);
-
+    // ✅ Get user
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
@@ -52,6 +55,7 @@ console.log("SECRET:", process.env.JWT_SECRET);
       });
     }
 
+    // ✅ Attach user
     req.user = {
       id: user._id,
       email: user.email,
@@ -60,9 +64,11 @@ console.log("SECRET:", process.env.JWT_SECRET);
 
     next();
 
+  } catch (error) {
     console.error("Auth Middleware Error:", error.message);
 
     return res.status(401).json({
       message: "Not authorized",
     });
-  
+  }
+};
