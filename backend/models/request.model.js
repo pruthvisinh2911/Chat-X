@@ -2,38 +2,37 @@ import mongoose from "mongoose";
 
 const requestSchema = new mongoose.Schema(
   {
-    senderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    receiverId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+    ],
 
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
-      default: "pending",
+      enum: ["pending", "accepted", "blocked"],
+      required: true,
+    },
+
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    blockedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-requestSchema.index({ senderId: 1, receiverId: 1 }, { unique: true });
+requestSchema.index({ members: 1 }, { unique: true });
 
-requestSchema.pre("save", function (next) {
-  if (this.senderId.equals(this.receiverId)) {
-    return next(new Error("You cannot send request to yourself"));
-  }
-  next();
-});
-
-const Request = mongoose.models.Request || mongoose.model("Request", requestSchema);
+const Request =
+  mongoose.models.Request ||
+  mongoose.model("Request", requestSchema);
 
 export default Request;
