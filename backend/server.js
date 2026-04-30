@@ -10,6 +10,7 @@ import userRoutes from "./routes/user.routes.js";
 import cookieParser from "cookie-parser";
 import errorHandler from "./middleware/error.middleware.js";
 import requestRoutes from "./routes/request.routes.js";
+import messageRoutes from "./routes/message.routes.js";
 
 
 connectDB();
@@ -24,6 +25,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api", requestRoutes);
+app.use("/api",messageRoutes)
 
 app.use(errorHandler);
 

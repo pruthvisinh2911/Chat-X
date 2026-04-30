@@ -154,3 +154,38 @@ export const blockUser = async (req, res) => {
     });
   }
 };  
+
+export const unblockUser = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const targetUserId = req.params.userId;
+
+    const members = [currentUserId, targetUserId].sort();
+
+    const request = await Request.findOne({ members });
+
+    if (!request) {
+      return res.status(404).json({
+        message: "No relationship found",
+      });
+    }
+
+    if (request.status !== "blocked") {
+      return res.status(400).json({
+        message: "User is not blocked",
+      });
+    }
+
+    // 🔥 Option 1 (clean): delete record
+    await request.deleteOne();
+
+    return res.json({
+      message: "User unblocked",
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
