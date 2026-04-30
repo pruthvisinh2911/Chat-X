@@ -1,9 +1,7 @@
-import User from "../models/User.model.js"
-import asyncHandler from "../utils/asyncHandler.utils.js";
-import ApiError from "../utils/ApiError.utils.js";
+import User from "../models/User.model.js";
 
 export const searchUsers = async (req, res) => {
-
+  try {
     let { search } = req.query;
     const currentUserId = req.user.id;
 
@@ -40,12 +38,12 @@ export const searchUsers = async (req, res) => {
       .select("-password -otp -otpExpiry -loginAttempts -lockUntil")
       .limit(10);
 
-    res.json(users);
-
+    return res.json(users); 
+  } catch (error) {
     console.error("Search Error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
-  
+  }
 };
