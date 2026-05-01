@@ -64,6 +64,12 @@ const userSchema = new mongoose.Schema(
     default: 0,
   },
 
+  // 🔥 NEW FIELD (for auto delete if not verified)
+  verificationExpiresAt: {
+    type: Date,
+    default: null,
+  },
+
   loginAttempts: {
     type: Number,
     default: 0,
@@ -95,6 +101,12 @@ const userSchema = new mongoose.Schema(
 {
   timestamps: true,
 });
+
+userSchema.index(
+  { verificationExpiresAt: 1 },
+  { expireAfterSeconds: 0 }
+);
+
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 export default User;

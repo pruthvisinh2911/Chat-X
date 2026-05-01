@@ -81,19 +81,48 @@ export const registerUser = async (req, res) => {
       $or: [{ email }, { username }],
     }).session(session);
 
-    if (existingUser) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        message: "User already exists",
-      });
-    }
-
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
     const hashedOtp = await bcrypt.hash(rawOtp, 10);
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    const verificationExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 🔥 TTL (5 min)
+
+    // 🔥 CASE 1: User exists
+    if (existingUser) {
+      if (existingUser.isVerified) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          message: "User already exists",
+        });
+      }
+
+      // 🔥 Update unverified user
+      existingUser.firstName = firstName;
+      existingUser.lastName = lastName;
+      existingUser.username = username;
+      existingUser.password = hashedPassword;
+      existingUser.otp = hashedOtp;
+      existingUser.otpExpiry = otpExpiry;
+      existingUser.otpAttempts = 0;
+      existingUser.verificationExpiresAt = verificationExpiresAt;
+
+      await existingUser.save({ session });
+
+      await sendOtpEmail(email, rawOtp);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res.status(200).json({
+        message: "OTP resent. Please verify your email.",
+        userId: existingUser._id,
+        otp: rawOtp,
+      });
+    }
+
+    // 🔥 CASE 2: New user
     const user = await User.create(
       [
         {
@@ -106,6 +135,7 @@ export const registerUser = async (req, res) => {
           otpExpiry,
           otpAttempts: 0,
           isVerified: false,
+          verificationExpiresAt, // 🔥 TTL field
         },
       ],
       { session }
@@ -121,16 +151,6 @@ export const registerUser = async (req, res) => {
       userId: user[0]._id,
       otp: rawOtp,
     });
-    try {
-  await AuditLog.create({
-    userId: user._id,
-    action: "LOGIN",
-    ip: req.ip,
-    userAgent: req.headers["user-agent"],
-  });
-} catch (err) {
-  console.error("Audit log failed:", err.message);
-}
 
   } catch (error) {
     await session.abortTransaction();
@@ -143,6 +163,7 @@ export const registerUser = async (req, res) => {
     });
   }
 };
+
 export const refreshAccessToken = async (req, res) => {
 
     const oldRefreshToken = req.cookies?.refreshToken;
