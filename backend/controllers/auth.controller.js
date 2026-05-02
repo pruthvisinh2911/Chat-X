@@ -150,7 +150,6 @@ export const registerUser = async (req, res) => {
     });
   }
 };
-
 export const refreshAccessToken = async (req, res) => {
 
     const oldRefreshToken = req.cookies?.refreshToken;
@@ -242,7 +241,6 @@ export const refreshAccessToken = async (req, res) => {
     });
   
 };
-
 export const verifyOtp = async (req, res) => {
   try {
     let { email, otp } = req.body;
@@ -350,7 +348,6 @@ await User.updateOne(
     });
   }
 };
-
 export const resendOtp = async (req, res) => {
   try {
     let { email } = req.body;
@@ -398,7 +395,6 @@ export const resendOtp = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-
 export const loginUser = async (req, res) => {
 
     let { email, username, password } = req.body;
@@ -689,7 +685,6 @@ export const getMySessions = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-
 export const logoutUser = async (req, res) => {
   
     const token =
@@ -737,10 +732,7 @@ try {
     return res.status(500).json({
       message: "Server error",
     });
-    
-  
 };
-
 export const logoutAllDevices = async (req, res) => {
 
     const userId = req.user.id;
@@ -775,7 +767,6 @@ try {
     });
   
 };
-
 export const logoutSingleSession = async (req, res) => {
   try {
     const { sessionId } = req.body;
@@ -797,7 +788,6 @@ export const logoutSingleSession = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-
 export const getMyAuditLogs = async (req, res) => {
   try {
     const logs = await AuditLog.find({ userId: req.user.id })
