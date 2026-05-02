@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
   password: {
     type: String,
     required: true,
-    select: false, 
+    select: false,
   },
 
   profilePic: {
@@ -51,7 +51,7 @@ const userSchema = new mongoose.Schema(
   otp: {
     type: String,
     default: null,
-    select: false, 
+    select: false,
   },
 
   otpExpiry: {
@@ -64,7 +64,6 @@ const userSchema = new mongoose.Schema(
     default: 0,
   },
 
-  // 🔥 NEW FIELD (for auto delete if not verified)
   verificationExpiresAt: {
     type: Date,
     default: null,
@@ -83,10 +82,10 @@ const userSchema = new mongoose.Schema(
   resetPasswordToken: {
     type: String,
     default: null,
-    select: false, 
+    select: false,
   },
 
-  resetPasswordTokenId: {   
+  resetPasswordTokenId: {
     type: String,
     default: null,
     index: true,
@@ -104,7 +103,10 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index(
   { verificationExpiresAt: 1 },
-  { expireAfterSeconds: 0 }
+  {
+    expireAfterSeconds: 0,
+    partialFilterExpression: { isVerified: false },
+  }
 );
 
 const User = mongoose.models.User || mongoose.model("User", userSchema);

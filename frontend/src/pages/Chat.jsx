@@ -7,7 +7,7 @@ import {
 import Avatar from '../components/Avatar'
 import { contacts, conversations, friendRequests, currentUser } from '../data/mockData'
 
-/* ─── Desktop icon sidebar ─────────────────────────────────────── */
+
 function DesktopSidebar() {
   const navigate = useNavigate()
   const nav = [
@@ -40,7 +40,7 @@ function DesktopSidebar() {
   )
 }
 
-/* ─── Desktop chat list mini (lg+) ──────────────────────────────── */
+
 function DesktopChatList({ selectedId }) {
   const navigate = useNavigate()
 
@@ -88,7 +88,7 @@ function DesktopChatList({ selectedId }) {
   )
 }
 
-/* ─── Message bubble ─────────────────────────────────────────────── */
+
 function MessageBubble({ msg, contact, isMe, showAvatar }) {
   return (
     <div className={`flex items-end gap-2 mb-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -113,7 +113,7 @@ function MessageBubble({ msg, contact, isMe, showAvatar }) {
   )
 }
 
-/* ─── Chat window ────────────────────────────────────────────────── */
+
 export default function Chat() {
   const { id } = useParams()
   const navigate = useNavigate()

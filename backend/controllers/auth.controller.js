@@ -10,15 +10,11 @@ import AuditLog from "../models/AuditLog.model.js";
 import mongoose from "mongoose";
 
 export const registerUser = async (req, res) => {
-  const session = await mongoose.startSession();
-
   try {
-    session.startTransaction();
-
     let { firstName, lastName, username, email, password } = req.body;
 
+    // 🔹 Basic validation
     if (!firstName || !lastName || !username || !email || !password) {
-      await session.abortTransaction();
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -29,24 +25,23 @@ export const registerUser = async (req, res) => {
       typeof email !== "string" ||
       typeof password !== "string"
     ) {
-      await session.abortTransaction();
       return res.status(400).json({ message: "Invalid input format" });
     }
 
+    // 🔹 Normalize
     firstName = firstName.trim();
     lastName = lastName.trim();
     username = username.trim().toLowerCase();
     email = email.trim().toLowerCase();
 
+    // 🔹 Validations
     if (username.length < 3 || username.length > 20) {
-      await session.abortTransaction();
       return res.status(400).json({
         message: "Username must be between 3 and 20 characters",
       });
     }
 
     if (firstName.length < 2 || lastName.length < 2) {
-      await session.abortTransaction();
       return res.status(400).json({
         message: "Name must be at least 2 characters",
       });
@@ -54,7 +49,6 @@ export const registerUser = async (req, res) => {
 
     const usernameRegex = /^[a-z0-9_]+$/;
     if (!usernameRegex.test(username)) {
-      await session.abortTransaction();
       return res.status(400).json({
         message: "Username can only contain letters, numbers, underscore",
       });
@@ -62,7 +56,6 @@ export const registerUser = async (req, res) => {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      await session.abortTransaction();
       return res.status(400).json({ message: "Invalid email format" });
     }
 
@@ -70,16 +63,16 @@ export const registerUser = async (req, res) => {
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/;
 
     if (!passwordRegex.test(password)) {
-      await session.abortTransaction();
       return res.status(400).json({
         message:
           "Password must be at least 8 characters and include letter, number and special character",
       });
     }
 
-    const existingUser = await User.findOne({
+    // 🔹 Check existing user
+    let existingUser = await User.findOne({
       $or: [{ email }, { username }],
-    }).session(session);
+    });
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -87,76 +80,70 @@ export const registerUser = async (req, res) => {
     const hashedOtp = await bcrypt.hash(rawOtp, 10);
 
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-    const verificationExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 🔥 TTL (5 min)
+    const verificationExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     // 🔥 CASE 1: User exists
     if (existingUser) {
+      // ❌ Already verified → block
       if (existingUser.isVerified) {
-        await session.abortTransaction();
         return res.status(400).json({
           message: "User already exists",
         });
       }
 
-      // 🔥 Update unverified user
-      existingUser.firstName = firstName;
-      existingUser.lastName = lastName;
-      existingUser.username = username;
-      existingUser.password = hashedPassword;
-      existingUser.otp = hashedOtp;
-      existingUser.otpExpiry = otpExpiry;
-      existingUser.otpAttempts = 0;
-      existingUser.verificationExpiresAt = verificationExpiresAt;
+      // 🔥 If expired → allow overwrite
+      if (
+        existingUser.verificationExpiresAt &&
+        existingUser.verificationExpiresAt < new Date()
+      ) {
+        await User.deleteOne({ _id: existingUser._id });
 
-      await existingUser.save({ session });
+        existingUser = null;
+      } else {
+        // 🔁 Resend OTP (update same user)
+        existingUser.firstName = firstName;
+        existingUser.lastName = lastName;
+        existingUser.username = username;
+        existingUser.password = hashedPassword;
+        existingUser.otp = hashedOtp;
+        existingUser.otpExpiry = otpExpiry;
+        existingUser.otpAttempts = 0;
+        existingUser.verificationExpiresAt = verificationExpiresAt;
 
-      await sendOtpEmail(email, rawOtp);
+        await existingUser.save();
 
-      await session.commitTransaction();
-      session.endSession();
+        await sendOtpEmail(email, rawOtp);
 
-      return res.status(200).json({
-        message: "OTP resent. Please verify your email.",
-        userId: existingUser._id,
-        otp: rawOtp,
-      });
+        return res.status(200).json({
+          message: "OTP resent. Please verify your email.",
+          userId: existingUser._id,
+        });
+      }
     }
 
-    // 🔥 CASE 2: New user
-    const user = await User.create(
-      [
-        {
-          firstName,
-          lastName,
-          username,
-          email,
-          password: hashedPassword,
-          otp: hashedOtp,
-          otpExpiry,
-          otpAttempts: 0,
-          isVerified: false,
-          verificationExpiresAt, // 🔥 TTL field
-        },
-      ],
-      { session }
-    );
+    // 🔥 CASE 2: Create new user
+    const user = await User.create({
+      firstName,
+      lastName,
+      username,
+      email,
+      password: hashedPassword,
+      otp: hashedOtp,
+      otpExpiry,
+      otpAttempts: 0,
+      isVerified: false,
+      verificationExpiresAt,
+    });
 
     await sendOtpEmail(email, rawOtp);
 
-    await session.commitTransaction();
-    session.endSession();
-
     return res.status(201).json({
       message: "Registration successful. Please verify your email.",
-      userId: user[0]._id,
-      otp: rawOtp,
+      userId: user._id,
     });
 
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
-    console.error("REGISTER ERROR FULL:", error);
+    console.error("REGISTER ERROR:", error);
 
     return res.status(500).json({
       message: error.message || "Server error",
@@ -257,9 +244,10 @@ export const refreshAccessToken = async (req, res) => {
 };
 
 export const verifyOtp = async (req, res) => {
-
+  try {
     let { email, otp } = req.body;
 
+    // 🔹 Validation
     if (!email || !otp) {
       return res.status(400).json({
         message: "Email and OTP are required",
@@ -281,6 +269,7 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
+    // 🔹 Find user
     const user = await User.findOne({ email }).select("+otp");
 
     if (!user) {
@@ -295,16 +284,14 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
-    console.log("Stored OTP:", user.otp);
-    console.log("Expiry:", user.otpExpiry);
-    console.log("Now:", new Date());
-
+    // 🔹 Check OTP existence
     if (!user.otp || !user.otpExpiry) {
       return res.status(400).json({
         message: "OTP expired or already used",
       });
     }
 
+    // 🔹 Expiry check
     if (user.otpExpiry < new Date()) {
       user.otp = null;
       user.otpExpiry = null;
@@ -315,6 +302,7 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
+    // 🔹 Attempts check
     if (user.otpAttempts >= 3) {
       user.otp = null;
       user.otpExpiry = null;
@@ -325,6 +313,7 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
+    // 🔹 Compare OTP
     const isMatch = await bcrypt.compare(otp, user.otp);
 
     if (!isMatch) {
@@ -336,24 +325,30 @@ export const verifyOtp = async (req, res) => {
       });
     }
 
-    user.isVerified = true;
-    user.otp = null;
-    user.otpExpiry = null;
-    user.otpAttempts = 0;
-
-    await user.save();
+await User.updateOne(
+  { _id: user._id },
+  {
+    $set: {
+      isVerified: true,
+      otp: null,
+      otpExpiry: null,
+      otpAttempts: 0,
+      verificationExpiresAt: null, 
+    },
+  }
+);
 
     return res.status(200).json({
       message: "Email verified successfully",
     });
 
-  
+  } catch (error) {
     console.error("OTP Verify Error:", error.message);
 
     return res.status(500).json({
       message: "Server error",
     });
-  
+  }
 };
 
 export const resendOtp = async (req, res) => {
