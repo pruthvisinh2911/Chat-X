@@ -176,7 +176,6 @@ export const unblockUser = async (req, res) => {
       });
     }
 
-    // 🔥 Option 1 (clean): delete record
     await request.deleteOne();
 
     return res.json({

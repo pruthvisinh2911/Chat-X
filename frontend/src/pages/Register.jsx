@@ -11,40 +11,82 @@ export default function Register() {
     email: '',
     password: ''
   })
+
+  const [errors, setErrors] = useState({})
+  const [serverError, setServerError] = useState("")
+
   const navigate = useNavigate()
 
-  
-  const handleSubmit = async (e) => {
-  e.preventDefault()
+  // ✅ VALIDATION
+  const validate = () => {
+    let newErrors = {}
 
-  try {
-    const res = await fetch("http://localhost:5000/api/auth/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    })
-
-    const data = await res.json()
-
-    if (!res.ok) {
-      alert(data.message || "Something went wrong")
-      return
+    if (form.firstName.trim().length < 2) {
+      newErrors.firstName = "At least 2 characters required"
     }
 
-    alert("OTP sent to your email")
+    if (form.lastName.trim().length < 2) {
+      newErrors.lastName = "At least 2 characters required"
+    }
 
+    if (form.username.length < 3 || form.username.length > 20) {
+      newErrors.username = "Username must be 3–20 characters"
+    } else if (!/^[a-z0-9_]+$/.test(form.username)) {
+      newErrors.username = "Only lowercase, numbers, underscore"
+    }
 
-    localStorage.setItem("verifyEmail", form.email)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      newErrors.email = "Invalid email format"
+    }
 
-    navigate("/verify")
+    if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&]).{8,}$/.test(form.password)) {
+      newErrors.password = "Min 8 chars + number + special char"
+    }
 
-  } catch (error) {
-    console.error("Register error:", error)
-    alert("Server error")
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
-}
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    setServerError("")
+
+    // ✅ frontend validation first
+    if (!validate()) return
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        // ✅ map backend errors
+        if (data.message?.toLowerCase().includes("username")) {
+          setErrors({ username: data.message })
+        } else if (data.message?.toLowerCase().includes("email")) {
+          setErrors({ email: data.message })
+        } else {
+          setServerError(data.message)
+        }
+        return
+      }
+
+      // ✅ success
+      localStorage.setItem("verifyEmail", form.email)
+      navigate("/verify")
+
+    } catch (error) {
+      console.error("Register error:", error)
+      setServerError("Server error")
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#09090b] flex items-center justify-center px-4 py-8 relative overflow-y-auto">
@@ -74,6 +116,7 @@ export default function Register() {
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/70 focus:ring-1 focus:ring-violet-500/30 transition-all"
                 required
               />
+              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
             </div>
 
             <div>
@@ -86,6 +129,7 @@ export default function Register() {
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/70 focus:ring-1 focus:ring-violet-500/30 transition-all"
                 required
               />
+              {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
             </div>
           </div>
 
@@ -100,6 +144,7 @@ export default function Register() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/70 focus:ring-1 focus:ring-violet-500/30 transition-all"
               required
             />
+            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
           </div>
 
           {/* Email */}
@@ -113,6 +158,7 @@ export default function Register() {
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-violet-500/70 focus:ring-1 focus:ring-violet-500/30 transition-all"
               required
             />
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
 
           {/* Password */}
@@ -135,7 +181,13 @@ export default function Register() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>
+
+          {/* Server Error */}
+          {serverError && (
+            <p className="text-red-500 text-sm text-center">{serverError}</p>
+          )}
 
           {/* Terms */}
           <p className="text-xs text-zinc-600 leading-relaxed px-0.5">

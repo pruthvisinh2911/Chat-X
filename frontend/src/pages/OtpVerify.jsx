@@ -112,24 +112,37 @@ export default function OtpVerify() {
     }
   }
 
-  const handleResend = async () => {
-    if (!canResend) return
+const handleResend = async () => {
+  if (!canResend) return
 
-    try {
-      await fetch('http://localhost:5000/api/auth/resend-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      })
-    } catch (err) {}
+  try {
+    const res = await fetch('http://localhost:5000/api/auth/resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    })
 
+    const data = await res.json()
+
+    // ✅ HANDLE ERROR RESPONSE (THIS WAS MISSING)
+    if (!res.ok) {
+      setError(data.message || "Failed to resend OTP")
+      triggerShake()
+      return
+    }
+
+    // ✅ SUCCESS FLOW (same as your existing logic)
     setCanResend(false)
-    setResendTimer(30)
+    setResendTimer(60)
     setOtp(['', '', '', '', '', ''])
     setError('')
     inputRefs.current[0]?.focus()
-  }
 
+  } catch (err) {
+    setError("Server error. Please try again.")
+    triggerShake()
+  }
+}
   const filled = otp.filter(Boolean).length
 
   return (

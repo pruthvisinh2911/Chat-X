@@ -69,10 +69,9 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // 🔹 Check existing user
-    let existingUser = await User.findOne({
-      $or: [{ email }, { username }],
-    });
+    // ✅ 🔥 FIXED: separate checks
+    const existingEmail = await User.findOne({ email });
+    const existingUsername = await User.findOne({ username });
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -82,46 +81,50 @@ export const registerUser = async (req, res) => {
     const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     const verificationExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    // 🔥 CASE 1: User exists
-    if (existingUser) {
-      // ❌ Already verified → block
-      if (existingUser.isVerified) {
-        return res.status(400).json({
-          message: "User already exists",
+    // 🔥 EMAIL EXISTS
+    if (existingEmail) {
+      // ✅ VERIFIED → BLOCK
+      if (existingEmail.isVerified) {
+        return res.status(409).json({
+          message: "User already exists. Please login.",
         });
       }
 
-      // 🔥 If expired → allow overwrite
+      // 🔥 EXPIRED → DELETE
       if (
-        existingUser.verificationExpiresAt &&
-        existingUser.verificationExpiresAt < new Date()
+        existingEmail.verificationExpiresAt &&
+        existingEmail.verificationExpiresAt < new Date()
       ) {
-        await User.deleteOne({ _id: existingUser._id });
-
-        existingUser = null;
+        await User.deleteOne({ _id: existingEmail._id });
       } else {
-        // 🔁 Resend OTP (update same user)
-        existingUser.firstName = firstName;
-        existingUser.lastName = lastName;
-        existingUser.username = username;
-        existingUser.password = hashedPassword;
-        existingUser.otp = hashedOtp;
-        existingUser.otpExpiry = otpExpiry;
-        existingUser.otpAttempts = 0;
-        existingUser.verificationExpiresAt = verificationExpiresAt;
+        // 🔁 RESEND OTP
+        existingEmail.firstName = firstName;
+        existingEmail.lastName = lastName;
+        existingEmail.username = username;
+        existingEmail.password = hashedPassword;
+        existingEmail.otp = hashedOtp;
+        existingEmail.otpExpiry = otpExpiry;
+        existingEmail.otpAttempts = 0;
+        existingEmail.verificationExpiresAt = verificationExpiresAt;
 
-        await existingUser.save();
-
+        await existingEmail.save();
         await sendOtpEmail(email, rawOtp);
 
         return res.status(200).json({
           message: "OTP resent. Please verify your email.",
-          userId: existingUser._id,
+          userId: existingEmail._id,
         });
       }
     }
 
-    // 🔥 CASE 2: Create new user
+    // 🔥 USERNAME EXISTS (ONLY IF EMAIL IS NEW)
+    if (existingUsername) {
+      return res.status(409).json({
+        message: "Username already taken",
+      });
+    }
+
+    // 🔥 CREATE NEW USER
     const user = await User.create({
       firstName,
       lastName,
@@ -146,7 +149,7 @@ export const registerUser = async (req, res) => {
     console.error("REGISTER ERROR:", error);
 
     return res.status(500).json({
-      message: error.message || "Server error",
+      message: "Server error",
     });
   }
 };
@@ -368,11 +371,17 @@ export const resendOtp = async (req, res) => {
       return res.status(400).json({ message: "User already verified" });
     }
 
-    // ❗ prevent spam
-    if (user.otpExpiry && user.otpExpiry > new Date()) {
-      return res.status(400).json({
-        message: "OTP already sent. Please wait before requesting again.",
-      });
+    // ✅ FIX: correct last OTP sent time calculation
+    if (user.otpExpiry) {
+      const otpDuration = 10 * 60 * 1000; // 10 min
+      const lastOtpTime = new Date(user.otpExpiry.getTime() - otpDuration);
+      const now = new Date();
+
+      if (now - lastOtpTime < 60 * 1000) {
+        return res.status(400).json({
+          message: "Please wait 60 seconds before requesting a new OTP",
+        });
+      }
     }
 
     const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -385,6 +394,8 @@ export const resendOtp = async (req, res) => {
     await user.save();
 
     await sendOtpEmail(email, rawOtp);
+
+    console.log("OTP SENT:", rawOtp, "to", email);
 
     return res.status(200).json({
       message: "OTP resent successfully",
