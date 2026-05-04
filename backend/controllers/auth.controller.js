@@ -515,10 +515,12 @@ export const loginUser = async (req, res) => {
       message: "Login successful",
       accessToken,
       user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-      },
+  id: user._id,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  username: user.username,
+  email: user.email,
+},
     });
 
 try {

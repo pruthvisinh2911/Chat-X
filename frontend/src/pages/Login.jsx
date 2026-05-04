@@ -33,8 +33,11 @@ const handleSubmit = async (e) => {
       return;
     }
 
-    localStorage.setItem("token", data.accessToken);
-    navigate("/home");
+localStorage.setItem("token", data.accessToken);
+localStorage.setItem("user", JSON.stringify(data.user));
+
+navigate("/home");
+
 
   } catch (err) {
     console.error(err);

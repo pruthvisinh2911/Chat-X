@@ -6,35 +6,58 @@ import {
 } from 'lucide-react'
 import Avatar from '../components/Avatar'
 import { contacts, conversations, friendRequests as initialRequests, currentUser } from '../data/mockData'
-
+import React from "react";
 
 function DesktopSidebar({ active, setActive }) {
+  const [user, setUser] = React.useState(null)
+
+  React.useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("user"))
+    setUser(storedUser)
+  }, [])
+
+  const getInitials = () => {
+    if (!user?.username) return "U"
+
+    return user.username
+      .split(" ")
+      .map(word => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
+  }
+
   const nav = [
     { id: 'chats', icon: MessageSquare },
     { id: 'requests', icon: Users },
     { id: 'settings', icon: Settings },
   ]
+
+  if (!user) return null
+
   return (
     <aside className="hidden md:flex w-14 flex-col items-center py-5 gap-2 bg-zinc-950 border-r border-zinc-800/60 shrink-0">
       <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center mb-3 shadow-lg shadow-violet-500/20 shrink-0">
         <Zap size={17} className="text-white" strokeWidth={2.5} />
       </div>
+
       <div className="flex-1 flex flex-col gap-1.5">
         {nav.map(({ id, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActive(id)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all relative
-              ${active === id ? 'bg-violet-600/20 text-violet-400' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'}`}
+              ${active === id
+                ? 'bg-violet-600/20 text-violet-400'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+              }`}
           >
             <Icon size={18} />
-            {id === 'requests' && initialRequests.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-pink-500" />
-            )}
           </button>
         ))}
       </div>
-      <Avatar initials={currentUser.initials} size="sm" />
+
+      <Avatar initials={getInitials()} size="sm" />
     </aside>
   )
 }
@@ -240,9 +263,22 @@ function RequestsPanel() {
 }
 
 /* ─── Settings panel ─────────────────────────────────────────────── */
+
+
 function SettingsPanel() {
+
+  // ✅ GET USER FROM LOCAL STORAGE
+  const user = JSON.parse(localStorage.getItem("user"))
+
+  // ✅ CREATE INITIALS
+  const getInitials = (first, last) => {
+    return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase()
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-[#09090b] min-h-0">
+
+      {/* HEADER */}
       <div className="px-4 md:px-8 pt-5 md:pt-8 pb-4 border-b border-zinc-800/60 shrink-0">
         <div className="flex items-center gap-2.5 mb-0.5">
           <div className="md:hidden w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center">
@@ -253,17 +289,34 @@ function SettingsPanel() {
         <p className="text-sm text-zinc-500">Manage your account</p>
       </div>
 
+      {/* BODY */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 py-5 md:py-6">
         <div className="max-w-md">
+
+          {/* ✅ USER CARD (FIXED) */}
           <div className="flex items-center gap-4 mb-8 bg-zinc-900/50 border border-zinc-800/60 rounded-2xl p-4">
-            <Avatar initials="AK" size="xl" />
+            
+            <Avatar
+              initials={getInitials(user?.firstName, user?.lastName)}
+              size="xl"
+            />
+
             <div className="flex-1 min-w-0">
-              <p className="text-white font-semibold">Alex Kim</p>
-              <p className="text-zinc-500 text-sm">@alexkim</p>
+              <p className="text-white font-semibold">
+                {user?.firstName || "User"} {user?.lastName || ""}
+              </p>
+
+              <p className="text-zinc-500 text-sm">
+                @{user?.username || "username"}
+              </p>
             </div>
-            <button className="text-xs text-violet-400 hover:text-violet-300 transition-colors shrink-0">Edit</button>
+
+            <button className="text-xs text-violet-400 hover:text-violet-300 transition-colors shrink-0">
+              Edit
+            </button>
           </div>
 
+          {/* SETTINGS LIST */}
           {[
             { label: 'Notifications', desc: 'Manage push notifications' },
             { label: 'Privacy', desc: 'Who can send you requests' },
@@ -275,12 +328,21 @@ function SettingsPanel() {
               className="w-full flex items-center justify-between py-4 border-b border-zinc-800/60 text-left group"
             >
               <div>
-                <p className={`text-sm font-medium ${item.danger ? 'text-rose-400' : 'text-white'}`}>{item.label}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">{item.desc}</p>
+                <p className={`text-sm font-medium ${item.danger ? 'text-rose-400' : 'text-white'}`}>
+                  {item.label}
+                </p>
+                <p className="text-xs text-zinc-600 mt-0.5">
+                  {item.desc}
+                </p>
               </div>
-              <ChevronRight size={16} className="text-zinc-700 group-hover:text-zinc-500 transition-colors shrink-0" />
+
+              <ChevronRight
+                size={16}
+                className="text-zinc-700 group-hover:text-zinc-500 transition-colors shrink-0"
+              />
             </button>
           ))}
+
         </div>
       </div>
     </div>
