@@ -120,7 +120,7 @@ export const registerUser = async (req, res) => {
     // 🔥 USERNAME EXISTS (ONLY IF EMAIL IS NEW)
     if (existingUsername) {
       return res.status(409).json({
-        message: "Username already taken",
+        message: "Username already taken , try something else",
       });
     }
 
@@ -377,9 +377,9 @@ export const resendOtp = async (req, res) => {
       const lastOtpTime = new Date(user.otpExpiry.getTime() - otpDuration);
       const now = new Date();
 
-      if (now - lastOtpTime < 60 * 1000) {
+      if (now - lastOtpTime < 30 * 1000) {
         return res.status(400).json({
-          message: "Please wait 60 seconds before requesting a new OTP",
+          message: "Please wait 30 seconds before requesting a new OTP",
         });
       }
     }

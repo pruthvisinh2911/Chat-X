@@ -5,6 +5,7 @@ import OtpVerify from './pages/OtpVerify'
 import ForgotPassword from './pages/ForgotPassword'
 import Home from './pages/Home'
 import Chat from './pages/Chat'
+import ProtectedRoute from './components/ProtectedRoute' // ✅ ADD THIS
 
 export default function App() {
   return (
@@ -14,8 +15,26 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/verify" element={<OtpVerify />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/chat/:id" element={<Chat />} />
+
+        {/* ✅ PROTECTED ROUTES */}
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/chat/:id"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

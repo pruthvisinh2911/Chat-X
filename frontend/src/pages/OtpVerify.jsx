@@ -128,7 +128,7 @@ const handleResend = async () => {
 
   
     setCanResend(false)
-    setResendTimer(60)
+    setResendTimer(30)
     setOtp(['', '', '', '', '', ''])
     setError('')
     inputRefs.current[0]?.focus()
