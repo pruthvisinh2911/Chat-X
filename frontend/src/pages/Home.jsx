@@ -7,7 +7,7 @@ import {
 import Avatar from '../components/Avatar'
 import { contacts, conversations, friendRequests as initialRequests, currentUser } from '../data/mockData'
 
-/* ─── Desktop icon sidebar ─────────────────────────────────────── */
+
 function DesktopSidebar({ active, setActive }) {
   const nav = [
     { id: 'chats', icon: MessageSquare },
@@ -39,7 +39,7 @@ function DesktopSidebar({ active, setActive }) {
   )
 }
 
-/* ─── Mobile bottom tab bar ─────────────────────────────────────── */
+
 function MobileTabBar({ active, setActive }) {
   const tabs = [
     { id: 'chats', icon: MessageSquare, label: 'Chats' },

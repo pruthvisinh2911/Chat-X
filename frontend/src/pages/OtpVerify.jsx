@@ -12,7 +12,7 @@ export default function OtpVerify() {
   const inputRefs = useRef([])
   const navigate = useNavigate()
 
-  // 🔹 Get email from localStorage
+
   useEffect(() => {
     const storedEmail = localStorage.getItem('verifyEmail')
     if (!storedEmail) {
@@ -22,7 +22,6 @@ export default function OtpVerify() {
     }
   }, [navigate])
 
-  // Countdown timer for resend
   useEffect(() => {
     if (resendTimer === 0) { setCanResend(true); return }
     const t = setTimeout(() => setResendTimer(s => s - 1), 1000)
@@ -70,7 +69,6 @@ export default function OtpVerify() {
     setTimeout(() => setShake(false), 500)
   }
 
-  // 🔥 REAL VERIFY LOGIC
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -97,11 +95,9 @@ export default function OtpVerify() {
       const data = await res.json()
 
       if (res.ok) {
-        // ✅ SUCCESS
         localStorage.removeItem('verifyEmail')
         navigate('/login')
       } else {
-        // ❌ FAILURE
         setError(data.message || 'Invalid OTP')
         triggerShake()
       }
@@ -124,14 +120,13 @@ const handleResend = async () => {
 
     const data = await res.json()
 
-    // ✅ HANDLE ERROR RESPONSE (THIS WAS MISSING)
     if (!res.ok) {
       setError(data.message || "Failed to resend OTP")
       triggerShake()
       return
     }
 
-    // ✅ SUCCESS FLOW (same as your existing logic)
+  
     setCanResend(false)
     setResendTimer(60)
     setOtp(['', '', '', '', '', ''])

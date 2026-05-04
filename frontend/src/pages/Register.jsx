@@ -52,7 +52,6 @@ export default function Register() {
 
     setServerError("")
 
-    // ✅ frontend validation first
     if (!validate()) return
 
     try {
@@ -67,7 +66,6 @@ export default function Register() {
       const data = await res.json()
 
       if (!res.ok) {
-        // ✅ map backend errors
         if (data.message?.toLowerCase().includes("username")) {
           setErrors({ username: data.message })
         } else if (data.message?.toLowerCase().includes("email")) {
@@ -78,7 +76,6 @@ export default function Register() {
         return
       }
 
-      // ✅ success
       localStorage.setItem("verifyEmail", form.email)
       navigate("/verify")
 
@@ -133,7 +130,6 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Username */}
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5 ml-0.5">Username</label>
             <input
@@ -147,7 +143,7 @@ export default function Register() {
             {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
           </div>
 
-          {/* Email */}
+
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5 ml-0.5">Email</label>
             <input
