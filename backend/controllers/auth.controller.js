@@ -21,7 +21,7 @@ export const registerUser = async (req, res) => {
     if (
       typeof firstName !== "string" ||
       typeof lastName !== "string" ||
-      typeof username !== "string" ||
+      typeof username !== "string" || 
       typeof email !== "string" ||
       typeof password !== "string"
     ) {
@@ -34,7 +34,7 @@ export const registerUser = async (req, res) => {
     username = username.trim().toLowerCase();
     email = email.trim().toLowerCase();
 
-    // 🔹 Validations
+    // 🔹 Validations 
     if (username.length < 3 || username.length > 20) {
       return res.status(400).json({
         message: "Username must be between 3 and 20 characters",
